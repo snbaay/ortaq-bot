@@ -1,6 +1,7 @@
 package kz.homebot.bot;
 
 import jakarta.annotation.PostConstruct;
+import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.service.MessageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,9 @@ import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateC
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
@@ -28,15 +31,31 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     private final String botUsername;
     private final TelegramClient telegramClient;
     private final MessageService messageService;
+    private final MemberRegistrationService memberRegistrationService;
 
     public HomeTelegramBot(
             @Value("${bot.token}") String botToken,
             @Value("${bot.username}") String botUsername,
-            MessageService messageService) {
+            MessageService messageService,
+            MemberRegistrationService memberRegistrationService) {
         this.botToken = botToken;
         this.botUsername = botUsername;
         this.messageService = messageService;
+        this.memberRegistrationService = memberRegistrationService;
         this.telegramClient = new OkHttpTelegramClient(botToken);
+    }
+
+    public HomeTelegramBot(
+            String botToken,
+            String botUsername,
+            MessageService messageService,
+            MemberRegistrationService memberRegistrationService,
+            TelegramClient telegramClient) {
+        this.botToken = botToken;
+        this.botUsername = botUsername;
+        this.messageService = messageService;
+        this.memberRegistrationService = memberRegistrationService;
+        this.telegramClient = telegramClient;
     }
 
     @Override
@@ -76,8 +95,19 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             return;
         }
 
-        String text = update.getMessage().getText().trim();
-        Long chatId = update.getMessage().getChatId();
+        Message message = update.getMessage();
+        Chat chat = message.getChat();
+        String text = message.getText().trim();
+        Long chatId = message.getChatId();
+
+        boolean isGroup = chat.isGroupChat() || chat.isSuperGroupChat()
+                || "group".equals(chat.getType()) || "supergroup".equals(chat.getType());
+
+        if (isGroup) {
+            if (message.getFrom() != null) {
+                memberRegistrationService.registerMember(chatId, chat.getTitle(), message.getFrom());
+            }
+        }
 
         if (isCommand(text, "/start")) {
             handleStartCommand(chatId);

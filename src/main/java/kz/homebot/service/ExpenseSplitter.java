@@ -1,7 +1,5 @@
 package kz.homebot.service;
 
-import org.springframework.stereotype.Component;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -12,7 +10,6 @@ import java.util.List;
  * Splits an amount equally among N people.
  * Leftover tiyn (0.01) distributed one-by-one to first members.
  */
-@Component
 public class ExpenseSplitter {
 
     /**

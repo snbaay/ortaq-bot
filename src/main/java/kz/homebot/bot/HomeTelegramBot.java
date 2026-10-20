@@ -51,6 +51,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     private final ExpenseParser expenseParser;
     private final MoneyFormatter moneyFormatter;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public HomeTelegramBot(
             @Value("${bot.token}") String botToken,
             @Value("${bot.username}") String botUsername,

@@ -66,8 +66,25 @@ class ExpenseParserTest {
     }
 
     @Test
+    void rejectsBothSeparators() {
+        assertThrows(IllegalArgumentException.class, () -> parser.parse("1.250,50 нан"));
+        assertThrows(IllegalArgumentException.class, () -> parser.parse("1,250.50 нан"));
+    }
+
+    @Test
+    void rejectsAboveMax() {
+        assertThrows(IllegalArgumentException.class, () -> parser.parse("100000001 нан"));
+    }
+
+    @Test
     void rejectsNoDescription() {
         assertThrows(IllegalArgumentException.class, () -> parser.parse("/shygyn 100"));
+    }
+
+    @Test
+    void rejectsTooLongDescription() {
+        String longDesc = "a".repeat(101);
+        assertThrows(IllegalArgumentException.class, () -> parser.parse("500 " + longDesc));
     }
 
     @Test

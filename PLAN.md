@@ -262,7 +262,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 \- \[x] \*\*A1. Bot infrastructure.\*\* `CommandParser` (pure, tests first: `/cmd`, `/cmd@OrtaqUiBot args`, `/cmd@OtherBot` is ignored, case-insensitive, extra spaces, no args, plain text is not a command). `CommandHandler`, `CommandContext`, `CommandRouter`, generic error handling, menu registration (`SetMyCommands`) built from all handlers' commands with Kazakh descriptions from `messages\_kk.properties`, `/start` and `/komek`. Move existing command code from `HomeTelegramBot` into handlers. Commit: `feat: command router and help`.
 
-\- \[ ] \*\*A2. Expenses.\*\* Pure `ExpenseParser`, `ExpenseSplitter`, `MoneyFormatter` (tests first), `ExpenseService`, `ExpenseHandler`.
+\- \[x] \*\*A2. Expenses.\*\* Pure `ExpenseParser`, `ExpenseSplitter`, `MoneyFormatter` (tests first), `ExpenseService`, `ExpenseHandler`.
 
 &#x20; - `/shygyn 630 су` in a group creates an expense paid by the sender. A plain group message that starts with a number (`630 су`, `2 500,50 хлеб`) does the same; other plain messages are ignored.
 

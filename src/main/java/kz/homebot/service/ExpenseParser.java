@@ -57,6 +57,13 @@ public class ExpenseParser {
             throw new IllegalArgumentException("no_description");
         }
 
+        if (numberPart.contains(".") && numberPart.contains(",")) {
+            throw new IllegalArgumentException("both_separators");
+        }
+        if (descPart.length() > 100) {
+            throw new IllegalArgumentException("description_too_long");
+        }
+
         // Normalize number: remove spaces (thousand separators), replace comma with dot
         String normalized = numberPart.replace(" ", "").replace(",", ".");
 
@@ -70,6 +77,11 @@ public class ExpenseParser {
         // Validate: must be positive
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("not_positive");
+        }
+
+        BigDecimal maxAmount = new BigDecimal("100000000");
+        if (amount.compareTo(maxAmount) > 0) {
+            throw new IllegalArgumentException("amount_too_large");
         }
 
         // Validate: max 2 decimal places

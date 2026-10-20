@@ -276,7 +276,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 &#x20; - Commit: `feat: expenses with equal split`.
 
-\- \[ ] \*\*A3. Balances and debts.\*\* Pure `DebtCalculator`, `BalanceService`, `BalanceHandler`.
+\- \[x] \*\*A3. Balances and debts.\*\* Pure `DebtCalculator`, `BalanceService`, `BalanceHandler`.
 
 &#x20; - `DebtCalculator`: `Map<Long, BigDecimal>` balances → `List<Transfer>` (`record Transfer(long fromMemberId, long toMemberId, BigDecimal amount)`). Greedy: repeatedly the biggest debtor pays the biggest creditor `min(debt, credit)` until all are zero. Ties broken by smaller member id (deterministic). Ignore zero balances.
 

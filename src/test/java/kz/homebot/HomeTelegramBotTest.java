@@ -1,8 +1,14 @@
 package kz.homebot;
 
 import kz.homebot.bot.HomeTelegramBot;
+import kz.homebot.repository.HouseholdRepository;
+import kz.homebot.service.BalanceService;
+import kz.homebot.service.DebtCalculator;
+import kz.homebot.service.ExpenseParser;
+import kz.homebot.service.ExpenseService;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.service.MessageService;
+import kz.homebot.service.MoneyFormatter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +25,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,6 +51,12 @@ class HomeTelegramBotTest {
                 "test_bot",
                 messageService,
                 memberRegistrationService,
+                mock(HouseholdRepository.class),
+                mock(ExpenseService.class),
+                mock(BalanceService.class),
+                mock(DebtCalculator.class),
+                mock(ExpenseParser.class),
+                mock(MoneyFormatter.class),
                 telegramClient
         );
     }

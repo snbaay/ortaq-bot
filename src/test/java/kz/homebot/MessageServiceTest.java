@@ -21,7 +21,7 @@ class MessageServiceTest {
         assertEquals("Кім кімге қарыз", messageService.getMessage("command.qaryz.description"));
         assertEquals("Баланс", messageService.getMessage("command.balans.description"));
         assertEquals("Қарызды жабу", messageService.getMessage("command.tolem.description"));
-        assertEquals("Соңғы шығынды өшіру", messageService.getMessage("command.oshiru.description"));
+        assertEquals("Жазбаны өшіру", messageService.getMessage("command.oshiru.description"));
     }
 
     @Test

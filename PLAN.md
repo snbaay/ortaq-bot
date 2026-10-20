@@ -260,7 +260,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 \- \[x] \*\*A0. Audit and stabilize the draft.\*\* Read the existing source and tests. In max 10 lines list what is missing or broken compared to this plan. Make the project compile and tests pass. Remove `@Component` from pure classes (use `LogicConfig`). Do NOT add new features. Commit: `chore: stabilize draft steps 3-4`.
 
-\- \[ ] \*\*A1. Bot infrastructure.\*\* `CommandParser` (pure, tests first: `/cmd`, `/cmd@OrtaqUiBot args`, `/cmd@OtherBot` is ignored, case-insensitive, extra spaces, no args, plain text is not a command). `CommandHandler`, `CommandContext`, `CommandRouter`, generic error handling, menu registration (`SetMyCommands`) built from all handlers' commands with Kazakh descriptions from `messages\_kk.properties`, `/start` and `/komek`. Move existing command code from `HomeTelegramBot` into handlers. Commit: `feat: command router and help`.
+\- \[x] \*\*A1. Bot infrastructure.\*\* `CommandParser` (pure, tests first: `/cmd`, `/cmd@OrtaqUiBot args`, `/cmd@OtherBot` is ignored, case-insensitive, extra spaces, no args, plain text is not a command). `CommandHandler`, `CommandContext`, `CommandRouter`, generic error handling, menu registration (`SetMyCommands`) built from all handlers' commands with Kazakh descriptions from `messages\_kk.properties`, `/start` and `/komek`. Move existing command code from `HomeTelegramBot` into handlers. Commit: `feat: command router and help`.
 
 \- \[ ] \*\*A2. Expenses.\*\* Pure `ExpenseParser`, `ExpenseSplitter`, `MoneyFormatter` (tests first), `ExpenseService`, `ExpenseHandler`.
 

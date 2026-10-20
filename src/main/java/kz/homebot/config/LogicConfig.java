@@ -1,5 +1,6 @@
 package kz.homebot.config;
 
+import kz.homebot.bot.CommandParser;
 import kz.homebot.service.DebtCalculator;
 import kz.homebot.service.ExpenseParser;
 import kz.homebot.service.ExpenseSplitter;
@@ -9,6 +10,11 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class LogicConfig {
+
+    @Bean
+    public CommandParser commandParser() {
+        return new CommandParser();
+    }
 
     @Bean
     public ExpenseSplitter expenseSplitter() {

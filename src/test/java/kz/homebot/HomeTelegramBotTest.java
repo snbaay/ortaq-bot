@@ -1,14 +1,12 @@
 package kz.homebot;
 
+import kz.homebot.bot.CommandParser;
+import kz.homebot.bot.CommandRouter;
+import kz.homebot.bot.ExpenseHandler;
 import kz.homebot.bot.HomeTelegramBot;
-import kz.homebot.repository.HouseholdRepository;
-import kz.homebot.service.BalanceService;
-import kz.homebot.service.DebtCalculator;
-import kz.homebot.service.ExpenseParser;
-import kz.homebot.service.ExpenseService;
+import kz.homebot.bot.StartHelpHandler;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.service.MessageService;
-import kz.homebot.service.MoneyFormatter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +19,8 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,17 +46,19 @@ class HomeTelegramBotTest {
 
     @BeforeEach
     void setUp() {
+        CommandParser parser = new CommandParser();
+        StartHelpHandler startHelpHandler = new StartHelpHandler(messageService);
+        ExpenseHandler expenseHandler = mock(ExpenseHandler.class);
+        CommandRouter router = new CommandRouter(List.of(startHelpHandler, expenseHandler), messageService);
+
         bot = new HomeTelegramBot(
                 "123456:fake_token",
                 "test_bot",
                 messageService,
                 memberRegistrationService,
-                mock(HouseholdRepository.class),
-                mock(ExpenseService.class),
-                mock(BalanceService.class),
-                mock(DebtCalculator.class),
-                mock(ExpenseParser.class),
-                mock(MoneyFormatter.class),
+                parser,
+                router,
+                expenseHandler,
                 telegramClient
         );
     }
@@ -87,6 +89,32 @@ class HomeTelegramBotTest {
         assertEquals("Сәлем!", captor.getValue().getText());
 
         verify(memberRegistrationService, never()).registerMember(any(), any(), any(User.class));
+    }
+
+    @Test
+    void komekCommandShouldReturnHelpText() throws Exception {
+        Update update = new Update();
+        Message message = new Message();
+        Chat chat = Chat.builder()
+                .id(888L)
+                .type("private")
+                .build();
+
+        User user = new User(888L, "Berik", false);
+
+        message.setChat(chat);
+        message.setFrom(user);
+        message.setText("/komek");
+        update.setMessage(message);
+
+        when(messageService.getMessage("bot.komek.text")).thenReturn("Көмек мәтіні");
+
+        bot.consume(update);
+
+        ArgumentCaptor<SendMessage> captor = ArgumentCaptor.forClass(SendMessage.class);
+        verify(telegramClient).execute(captor.capture());
+        assertEquals("888", captor.getValue().getChatId());
+        assertEquals("Көмек мәтіні", captor.getValue().getText());
     }
 
     @Test

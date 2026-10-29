@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Repository
 public interface ExpenseShareRepository extends JpaRepository<ExpenseShare, Long> {
@@ -27,4 +28,11 @@ public interface ExpenseShareRepository extends JpaRepository<ExpenseShare, Long
             GROUP BY es.member.id
             """)
     List<Object[]> sumSharesByMember(@Param("household") Household household);
+
+    @Query("select es.member.id, sum(es.shareAmount) from ExpenseShare es "
+            + "where es.expense.household = :household and es.expense.deleted = false "
+            + "and es.expense.settlement = false and es.expense.createdAt >= :start "
+            + "and es.expense.createdAt < :end group by es.member.id")
+    List<Object[]> monthlyConsumed(@Param("household") Household household,
+                                   @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

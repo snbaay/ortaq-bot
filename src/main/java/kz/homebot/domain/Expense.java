@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "expense")
@@ -48,7 +49,7 @@ public class Expense {
     }
 
     public Expense(Household household, Member payer, BigDecimal amount, String description) {
-        this(household, payer, amount, description, LocalDateTime.now(), false, false);
+        this(household, payer, amount, description, LocalDateTime.now(ZoneId.of("Asia/Almaty")), false, false);
     }
 
     public Expense(Household household, Member payer, BigDecimal amount, String description, LocalDateTime createdAt, boolean deleted) {
@@ -60,7 +61,7 @@ public class Expense {
         this.payer = payer;
         this.amount = amount;
         this.description = description;
-        this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
+        this.createdAt = createdAt != null ? createdAt : LocalDateTime.now(ZoneId.of("Asia/Almaty"));
         this.deleted = deleted;
         this.settlement = settlement;
     }

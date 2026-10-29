@@ -348,7 +348,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 
 
-\- \[ ] \*\*C1. Monthly report.\*\* `/esep` = current month (Asia/Almaty), `/esep 9` = month number 1–12 of the current year. Not-deleted expenses only, repayments excluded. Show: total household spending, per member "paid" and "consumed" (shares), top 3 biggest expenses. Use aggregation queries, not in-memory loops over all rows. Tests for the month boundaries (first and last day of the month, time zone). Commit: `feat: monthly report`.
+\- \[x] \*\*C1. Monthly report.\*\* `/esep` = current month (Asia/Almaty), `/esep 9` = month number 1–12 of the current year. Not-deleted expenses only, repayments excluded. Show: total household spending, per member "paid" and "consumed" (shares), top 3 biggest expenses. Use aggregation queries, not in-memory loops over all rows. Tests for the month boundaries (first and last day of the month, time zone). Commit: `feat: monthly report`.
 
 
 

@@ -9,6 +9,7 @@ import kz.homebot.service.NextCookPicker;
 import kz.homebot.service.DigestPolicy;
 import kz.homebot.service.ChoreAge;
 import kz.homebot.service.PaymentCountdown;
+import kz.homebot.service.RandomPicker;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -55,4 +56,7 @@ public class LogicConfig {
 
     @Bean
     public PaymentCountdown paymentCountdown() { return new PaymentCountdown(); }
+
+    @Bean
+    public RandomPicker randomPicker() { return new RandomPicker(new java.util.Random()); }
 }

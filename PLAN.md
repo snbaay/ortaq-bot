@@ -336,7 +336,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 \- \[x] \*\*B6. Payment deadlines with countdown.\*\* Pure `PaymentCountdown.daysLeft(LocalDate today, int dayOfMonth)`: days until the next occurrence; if the month is shorter than `dayOfMonth` use the last day of that month (tests first: same day = 0, tomorrow, next month, 31 in a 30-day month, 31 in February, 29 February in a leap year and not in a leap year). `PaymentDeadline` entity, service, `DeadlineHandler`: `/merzim\_qosu 5 150000 Жалдау` (amount `-` means none; title max 40 chars; max 20 deadlines per household), `/merzim` lists all sorted by days left (`Жалдау — 150 000 ₸ — 5 күн қалды`, `бүгін`, `ертең`), `/merzim\_oshiru <id>`. Extend the daily digest (B2) with reminder lines `⏰ {title}: {n} күн қалды` when days left is 3, 1 or 0. Tests. Commit: `feat: payment deadlines with countdown`.
 
-\- \[ ] \*\*B7. Randomizer.\*\* Pure `RandomPicker` that takes a `java.util.random.RandomGenerator` (tests with a seeded generator). `/kim` picks a random household member (`🎲 {name}`, optional text before the answer). `/tandau a, b, c` picks one option (2–10 options, split by comma or `|`, trim, ignore empty). `/tiyn` returns "Елтаңба" or "Сан". Tests. Commit: `feat: randomizer`.
+\- \[x] \*\*B7. Randomizer.\*\* Pure `RandomPicker` that takes a `java.util.random.RandomGenerator` (tests with a seeded generator). `/kim` picks a random household member (`🎲 {name}`, optional text before the answer). `/tandau a, b, c` picks one option (2–10 options, split by comma or `|`, trim, ignore empty). `/tiyn` returns "Елтаңба" or "Сан". Tests. Commit: `feat: randomizer`.
 
 
 

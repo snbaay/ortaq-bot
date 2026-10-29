@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import kz.homebot.config.Limits;
 
 @Service
 public class ShoppingService {
@@ -19,8 +20,8 @@ public class ShoppingService {
     @Transactional
     public List<ShoppingItem> add(Household household, Member member, String input) {
         List<String> names = Arrays.stream(input.split(",", -1)).map(String::trim).toList();
-        if (names.isEmpty() || names.stream().anyMatch(s -> s.isEmpty() || s.length() > 60)
-                || items.countByHouseholdAndBoughtFalse(household) + names.size() > 50) {
+        if (names.isEmpty() || names.stream().anyMatch(s -> s.isEmpty() || s.length() > Limits.SHOPPING_ITEM)
+                || items.countByHouseholdAndBoughtFalse(household) + names.size() > Limits.SHOPPING_OPEN) {
             throw new IllegalArgumentException("Shopping list limit exceeded or invalid item");
         }
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Almaty"));

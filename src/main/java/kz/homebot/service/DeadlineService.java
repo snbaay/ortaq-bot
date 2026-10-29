@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import kz.homebot.config.Limits;
 
 @Service
 public class DeadlineService {
@@ -21,10 +22,10 @@ public class DeadlineService {
     @Transactional
     public PaymentDeadline add(Household household, Member creator, int day, BigDecimal amount, String title) {
         String cleaned = title == null ? "" : title.trim();
-        if (day < 1 || day > 31 || cleaned.isEmpty() || cleaned.length() > 40
-                || deadlines.countByHouseholdAndActiveTrue(household) >= 20
+        if (day < 1 || day > 31 || cleaned.isEmpty() || cleaned.length() > Limits.DEADLINE_TITLE
+                || deadlines.countByHouseholdAndActiveTrue(household) >= Limits.DEADLINES
                 || (amount != null && (amount.compareTo(BigDecimal.ZERO) <= 0
-                || amount.compareTo(new BigDecimal("100000000")) > 0 || amount.scale() > 2))) {
+                || amount.compareTo(Limits.MAX_AMOUNT) > 0 || amount.scale() > 2))) {
             throw new IllegalArgumentException("Invalid deadline");
         }
         return deadlines.save(new PaymentDeadline(household, cleaned, day,

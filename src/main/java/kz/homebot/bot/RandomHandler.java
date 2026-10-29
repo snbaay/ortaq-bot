@@ -7,6 +7,7 @@ import kz.homebot.service.RandomPicker;
 import org.springframework.stereotype.Component;
 import java.util.Arrays;
 import java.util.List;
+import kz.homebot.config.Limits;
 
 @Component
 public class RandomHandler implements CommandHandler {
@@ -26,7 +27,7 @@ public class RandomHandler implements CommandHandler {
             case "tandau" -> {
                 List<String> options = Arrays.stream(ctx.args().split("[,|]"))
                         .map(String::trim).filter(s -> !s.isEmpty()).toList();
-                if (options.size() < 2 || options.size() > 10) {
+                if (options.size() < 2 || options.size() > Limits.RANDOM_OPTIONS) {
                     ctx.reply(messages.getMessage("random.usageChoose")); return;
                 }
                 ctx.reply(messages.getMessage("random.choice", picker.pick(options)));

@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import kz.homebot.config.Limits;
 
 @Service
 public class ChoreService {
@@ -19,7 +20,7 @@ public class ChoreService {
     @Transactional
     public ChoreLog add(Household household, Member member, String text) {
         String cleaned = text == null ? "" : text.trim();
-        if (cleaned.isEmpty() || cleaned.length() > 100) throw new IllegalArgumentException("Invalid chore");
+        if (cleaned.isEmpty() || cleaned.length() > Limits.CHORE) throw new IllegalArgumentException("Invalid chore");
         return logs.save(new ChoreLog(household, member, cleaned, LocalDateTime.now(ZoneId.of("Asia/Almaty"))));
     }
     @Transactional(readOnly = true)

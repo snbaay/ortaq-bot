@@ -5,6 +5,7 @@ import kz.homebot.bot.CommandRouter;
 import kz.homebot.bot.ExpenseHandler;
 import kz.homebot.bot.HomeTelegramBot;
 import kz.homebot.bot.StartHelpHandler;
+import kz.homebot.config.AllowedChats;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.service.MessageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -160,5 +161,22 @@ class HomeTelegramBotTest {
         bot.consume(update);
 
         verify(memberRegistrationService).registerMember(eq(-100987654321L), eq("Super Flat"), eq(user));
+    }
+
+    @Test
+    void ignoresUnlistedChatBeforeRegistration() {
+        CommandParser parser = new CommandParser();
+        ExpenseHandler expenseHandler = mock(ExpenseHandler.class);
+        CommandRouter router = new CommandRouter(List.of(new StartHelpHandler(messageService), expenseHandler), messageService);
+        HomeTelegramBot restricted = new HomeTelegramBot("123456:fake_token", "test_bot", messageService,
+                memberRegistrationService, parser, router, expenseHandler, telegramClient, new AllowedChats("-1"));
+        Update update = new Update();
+        Message message = new Message();
+        message.setChat(Chat.builder().id(-2L).type("group").title("Other").build());
+        message.setFrom(new User(2L, "User", false));
+        message.setText("/start");
+        update.setMessage(message);
+        restricted.consume(update);
+        verify(memberRegistrationService, never()).registerMember(any(), any(), any(User.class));
     }
 }

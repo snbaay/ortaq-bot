@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import kz.homebot.config.Limits;
 
 @Service
 public class NoteService {
@@ -18,7 +19,7 @@ public class NoteService {
     @Transactional
     public Note add(Household household, Member author, String text) {
         String cleaned = text == null ? "" : text.trim();
-        if (cleaned.isEmpty() || cleaned.length() > 300) throw new IllegalArgumentException("Invalid note");
+        if (cleaned.isEmpty() || cleaned.length() > Limits.NOTE) throw new IllegalArgumentException("Invalid note");
         return notes.save(new Note(household, author, cleaned, LocalDateTime.now(ZoneId.of("Asia/Almaty"))));
     }
 

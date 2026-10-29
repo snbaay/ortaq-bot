@@ -5,6 +5,7 @@ import org.telegram.telegrambots.meta.api.objects.MessageEntity;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+import kz.homebot.config.Limits;
 
 public record CommandContext(
         Long chatId,
@@ -33,8 +34,8 @@ public record CommandContext(
         if (text == null || text.isBlank() || replier == null) {
             return;
         }
-        if (text.length() > 4096) {
-            text = text.substring(0, 4095) + "…";
+        if (text.length() > Limits.TELEGRAM_MESSAGE) {
+            text = text.substring(0, Limits.TELEGRAM_MESSAGE - 1) + "…";
         }
         replier.accept(text);
     }

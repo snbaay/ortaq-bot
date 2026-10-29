@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.LinkedHashMap;
+import kz.homebot.config.Limits;
 
 @Service
 public class ExpenseService {
@@ -87,7 +88,7 @@ public class ExpenseService {
                 || !household.getId().equals(recipient.getHousehold().getId())
                 || payer.getId().equals(recipient.getId())
                 || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0
-                || amount.compareTo(new BigDecimal("100000000")) > 0 || amount.scale() > 2) {
+                || amount.compareTo(Limits.MAX_AMOUNT) > 0 || amount.scale() > 2) {
             throw new IllegalArgumentException("Invalid repayment");
         }
         Expense expense = new Expense(household, payer, amount.setScale(2), description,

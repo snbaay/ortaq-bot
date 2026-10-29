@@ -2,6 +2,7 @@ package kz.homebot.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import kz.homebot.config.Limits;
 
 /**
  * Pure Java class. Parses a raw text string into an amount + description.
@@ -60,7 +61,7 @@ public class ExpenseParser {
         if (numberPart.contains(".") && numberPart.contains(",")) {
             throw new IllegalArgumentException("both_separators");
         }
-        if (descPart.length() > 100) {
+        if (descPart.length() > Limits.EXPENSE_DESCRIPTION) {
             throw new IllegalArgumentException("description_too_long");
         }
 
@@ -79,7 +80,7 @@ public class ExpenseParser {
             throw new IllegalArgumentException("not_positive");
         }
 
-        BigDecimal maxAmount = new BigDecimal("100000000");
+        BigDecimal maxAmount = Limits.MAX_AMOUNT;
         if (amount.compareTo(maxAmount) > 0) {
             throw new IllegalArgumentException("amount_too_large");
         }

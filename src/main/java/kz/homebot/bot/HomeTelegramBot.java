@@ -1,6 +1,7 @@
 package kz.homebot.bot;
 
 import kz.homebot.service.MemberRegistrationService;
+import kz.homebot.config.AllowedChats;
 import kz.homebot.service.MessageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     private final CommandParser commandParser;
     private final CommandRouter commandRouter;
     private final ExpenseHandler expenseHandler;
+    private final AllowedChats allowedChats;
 
     @Autowired
     public HomeTelegramBot(
@@ -48,7 +50,8 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             MemberRegistrationService memberRegistrationService,
             CommandParser commandParser,
             CommandRouter commandRouter,
-            ExpenseHandler expenseHandler) {
+            ExpenseHandler expenseHandler,
+            AllowedChats allowedChats) {
         this.botToken = botToken;
         this.botUsername = botUsername;
         this.messageService = messageService;
@@ -56,6 +59,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         this.commandParser = commandParser;
         this.commandRouter = commandRouter;
         this.expenseHandler = expenseHandler;
+        this.allowedChats = allowedChats;
         this.telegramClient = new OkHttpTelegramClient(botToken);
     }
 
@@ -69,6 +73,14 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             CommandRouter commandRouter,
             ExpenseHandler expenseHandler,
             TelegramClient telegramClient) {
+        this(botToken, botUsername, messageService, memberRegistrationService,
+                commandParser, commandRouter, expenseHandler, telegramClient, new AllowedChats(""));
+    }
+
+    public HomeTelegramBot(String botToken, String botUsername, MessageService messageService,
+                           MemberRegistrationService memberRegistrationService, CommandParser commandParser,
+                           CommandRouter commandRouter, ExpenseHandler expenseHandler,
+                           TelegramClient telegramClient, AllowedChats allowedChats) {
         this.botToken = botToken;
         this.botUsername = botUsername;
         this.messageService = messageService;
@@ -76,6 +88,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         this.commandParser = commandParser;
         this.commandRouter = commandRouter;
         this.expenseHandler = expenseHandler;
+        this.allowedChats = allowedChats;
         this.telegramClient = telegramClient;
     }
 
@@ -116,6 +129,10 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         Chat chat = message.getChat();
         String text = message.getText().trim();
         Long chatId = message.getChatId();
+        if (!allowedChats.allows(chatId)) {
+            log.debug("Ignoring update from chat {}", chatId);
+            return;
+        }
         String chatType = chat.getType();
 
         boolean isGroup = chat.isGroupChat() || chat.isSuperGroupChat()

@@ -356,7 +356,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 
 
-\- \[ ] \*\*D1. Allowed chats and input limits.\*\* Optional env var `ALLOWED\_CHAT\_IDS` (comma-separated). If set, updates from other chats are ignored (log at DEBUG). Centralize all limits (text lengths, item counts, amount max) in one `Limits` class. Tests. Commit: `feat: allowed chats and limits`.
+\- \[x] \*\*D1. Allowed chats and input limits.\*\* Optional env var `ALLOWED\_CHAT\_IDS` (comma-separated). If set, updates from other chats are ignored (log at DEBUG). Centralize all limits (text lengths, item counts, amount max) in one `Limits` class. Tests. Commit: `feat: allowed chats and limits`.
 
 \- \[ ] \*\*D2. Full-flow test.\*\* One `@SpringBootTest` scenario on H2 using services directly (no Telegram): register 3 members; add expenses (equal split and mention split); check balances and `/qaryz` transfers; repay; undo; check balances again; cooking rota across 5 days; deadline countdown. Commit: `test: full flow scenario`.
 

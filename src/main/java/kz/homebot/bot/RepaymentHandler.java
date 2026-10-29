@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
+import kz.homebot.config.Limits;
 import java.util.stream.Collectors;
 
 @Component
@@ -144,7 +145,7 @@ public class RepaymentHandler implements CommandHandler {
         String normalized = str.replace(" ", "").replace(",", ".");
         try {
             BigDecimal amt = new BigDecimal(normalized);
-            if (amt.compareTo(BigDecimal.ZERO) <= 0 || amt.compareTo(new BigDecimal("100000000")) > 0) {
+            if (amt.compareTo(BigDecimal.ZERO) <= 0 || amt.compareTo(Limits.MAX_AMOUNT) > 0) {
                 return null;
             }
             return amt.setScale(2, RoundingMode.UNNECESSARY);

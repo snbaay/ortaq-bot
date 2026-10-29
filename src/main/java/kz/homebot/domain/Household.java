@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "household")
@@ -25,6 +26,9 @@ public class Household {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "last_digest_date")
+    private LocalDate lastDigestDate;
 
     public Household() {
     }
@@ -70,4 +74,7 @@ public class Household {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+
+    public LocalDate getLastDigestDate() { return lastDigestDate; }
+    public void setLastDigestDate(LocalDate lastDigestDate) { this.lastDigestDate = lastDigestDate; }
 }

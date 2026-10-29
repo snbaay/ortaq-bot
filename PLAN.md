@@ -302,7 +302,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 &#x20; - Commit: `feat: repayments, history and undo`.
 
-\- \[ ] \*\*A5. Split among selected people.\*\* Add `telegramUsername` handling (refresh on every message). `/shygyn 3000 пицца @berik @aknyet` splits the expense among the mentioned members AND the payer (the payer is always included; say so in `/komek`). Use Telegram message entities (`mention`, `text\_mention`) to read mentions. Unknown `@username` → error listing the known usernames. Without mentions the split is among all members. Tests for the mention-based split. Commit: `feat: split among mentioned members`.
+\- \[x] \*\*A5. Split among selected people.\*\* Add `telegramUsername` handling (refresh on every message). `/shygyn 3000 пицца @berik @aknyet` splits the expense among the mentioned members AND the payer (the payer is always included; say so in `/komek`). Use Telegram message entities (`mention`, `text\_mention`) to read mentions. Unknown `@username` → error listing the known usernames. Without mentions the split is among all members. Tests for the mention-based split. Commit: `feat: split among mentioned members`.
 
 
 

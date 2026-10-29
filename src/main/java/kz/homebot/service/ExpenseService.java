@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
+import java.util.LinkedHashMap;
 
 @Service
 public class ExpenseService {
@@ -40,10 +41,31 @@ public class ExpenseService {
      */
     @Transactional
     public ExpenseResult addExpense(Household household, Member payer, BigDecimal amount, String description) {
+        return saveExpense(household, payer, amount, description, memberRepository.findByHousehold(household));
+    }
+
+    @Transactional
+    public ExpenseResult addExpense(Household household, Member payer, BigDecimal amount, String description,
+                                    List<Member> selectedMembers) {
+        if (selectedMembers == null) {
+            throw new IllegalArgumentException("Selected members required");
+        }
+        LinkedHashMap<Long, Member> unique = new LinkedHashMap<>();
+        unique.put(payer.getId(), payer);
+        for (Member member : selectedMembers) {
+            if (!household.getId().equals(member.getHousehold().getId())) {
+                throw new IllegalArgumentException("Member belongs to another household");
+            }
+            unique.put(member.getId(), member);
+        }
+        List<Member> members = List.copyOf(unique.values());
+        return saveExpense(household, payer, amount, description, members);
+    }
+
+    private ExpenseResult saveExpense(Household household, Member payer, BigDecimal amount,
+                                      String description, List<Member> members) {
         Expense expense = new Expense(household, payer, amount, description);
         expense = expenseRepository.save(expense);
-
-        List<Member> members = memberRepository.findByHousehold(household);
         List<BigDecimal> shares = expenseSplitter.split(amount, members.size());
 
         for (int i = 0; i < members.size(); i++) {

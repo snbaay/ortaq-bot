@@ -35,6 +35,9 @@ public class Member {
     @Column(name = "display_name", nullable = false)
     private String displayName;
 
+    @Column(name = "telegram_username")
+    private String telegramUsername;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "household_id", nullable = false)
     private Household household;
@@ -78,6 +81,14 @@ public class Member {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public String getTelegramUsername() {
+        return telegramUsername;
+    }
+
+    public void setTelegramUsername(String telegramUsername) {
+        this.telegramUsername = telegramUsername;
     }
 
     public Household getHousehold() {

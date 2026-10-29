@@ -13,8 +13,13 @@ public record CommandContext(
         String command,
         String args,
         List<MessageEntity> entities,
-        Consumer<String> replier
+        Consumer<String> replier,
+        String rawText
 ) {
+    public CommandContext(Long chatId, String chatType, Sender sender, String command, String args,
+                          List<MessageEntity> entities, Consumer<String> replier) {
+        this(chatId, chatType, sender, command, args, entities, replier, args);
+    }
     public CommandContext {
         if (entities == null) {
             entities = Collections.emptyList();

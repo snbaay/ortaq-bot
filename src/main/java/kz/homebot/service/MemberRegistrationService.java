@@ -28,6 +28,12 @@ public class MemberRegistrationService {
 
     @Transactional
     public Member registerMember(Long telegramChatId, String chatTitle, Long telegramUserId, String firstName, String lastName) {
+        return registerMember(telegramChatId, chatTitle, telegramUserId, firstName, lastName, null);
+    }
+
+    @Transactional
+    public Member registerMember(Long telegramChatId, String chatTitle, Long telegramUserId, String firstName,
+                                 String lastName, String username) {
         Household household = householdRepository.findByTelegramChatId(telegramChatId)
                 .orElseGet(() -> {
                     String title = (chatTitle != null && !chatTitle.isBlank()) ? chatTitle.trim() : "Ортақ үй";
@@ -47,12 +53,13 @@ public class MemberRegistrationService {
             Member member = existingMember.get();
             if (!displayName.isBlank() && !displayName.equals(member.getDisplayName())) {
                 member.setDisplayName(displayName);
-                member = memberRepository.save(member);
             }
-            return member;
+            member.setTelegramUsername(username);
+            return memberRepository.save(member);
         }
 
         Member newMember = new Member(household, telegramUserId, displayName, LocalDateTime.now());
+        newMember.setTelegramUsername(username);
         Member savedMember = memberRepository.save(newMember);
         log.info("Registered member {} in household {}", savedMember.getDisplayName(), household.getTitle());
         return savedMember;
@@ -63,7 +70,8 @@ public class MemberRegistrationService {
         if (telegramUser == null) {
             throw new IllegalArgumentException("Telegram user must not be null");
         }
-        return registerMember(telegramChatId, chatTitle, telegramUser.getId(), telegramUser.getFirstName(), telegramUser.getLastName());
+        return registerMember(telegramChatId, chatTitle, telegramUser.getId(), telegramUser.getFirstName(),
+                telegramUser.getLastName(), telegramUser.getUserName());
     }
 
     @Transactional

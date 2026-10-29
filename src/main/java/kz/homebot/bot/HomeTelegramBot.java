@@ -137,7 +137,8 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                 "",
                 "",
                 message.getEntities(),
-                replyText -> send(chatId, replyText)
+                replyText -> send(chatId, replyText),
+                text
         );
 
         Optional<CommandParser.ParsedCommand> parsed = commandParser.parse(text, botUsername);
@@ -150,7 +151,8 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                     cmd.command(),
                     cmd.args(),
                     message.getEntities(),
-                    replyText -> send(chatId, replyText)
+                    replyText -> send(chatId, replyText),
+                    text
             );
             commandRouter.route(routedCtx);
         } else if (isGroup && startsWithDigit(text)) {

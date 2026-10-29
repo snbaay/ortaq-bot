@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.telegram.telegrambots.meta.api.objects.MessageEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -115,5 +116,29 @@ class ExpenseHandlerTest {
         handler.handlePlainExpense(ctx, "2 500,50 хлеб");
 
         assertThat(replies).containsExactly("Шығын қосылды!");
+    }
+
+    @Test
+    void mentionSelectsMemberAndPayer() {
+        Household household = new Household(-100L, "Flat");
+        household.setId(1L);
+        Member payer = new Member(household, 1L, "Askar");
+        payer.setId(1L);
+        Member berik = new Member(household, 2L, "Berik");
+        berik.setId(2L);
+        berik.setTelegramUsername("berik");
+        String raw = "/shygyn 3000 pizza @berik";
+        MessageEntity mention = new MessageEntity("mention", raw.indexOf("@berik"), 6);
+        when(householdRepository.findByTelegramChatId(-100L)).thenReturn(Optional.of(household));
+        when(memberRepository.findByHouseholdAndTelegramUserId(household, 1L)).thenReturn(Optional.of(payer));
+        when(memberRepository.findByHousehold(household)).thenReturn(List.of(payer, berik));
+        when(expenseService.addExpense(household, payer, new BigDecimal("3000.00"), "pizza", List.of(berik)))
+                .thenReturn(new ExpenseService.ExpenseResult(null, List.of(payer, berik),
+                        List.of(new BigDecimal("1500.00"), new BigDecimal("1500.00"))));
+        when(messageService.getMessage(eq("shygyn.added"), any(), any(), any(), any())).thenReturn("Added");
+        List<String> replies = new ArrayList<>();
+        handler.handle(new CommandContext(-100L, "group", new Sender(1L, "Askar", null), "shygyn",
+                "3000 pizza @berik", List.of(mention), replies::add, raw));
+        assertThat(replies).containsExactly("Added");
     }
 }

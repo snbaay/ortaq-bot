@@ -105,11 +105,16 @@ class MemberRegistrationServiceTest {
     void shouldRegisterMemberFromTelegramUserObject() {
         User user = new User(444L, "Aruzhan", false);
         user.setLastName("Arman");
+        user.setUserName("old_name");
 
         Member member = registrationService.registerMember(-100123456789L, "Dostar Flat", user);
 
         assertNotNull(member);
         assertEquals(444L, member.getTelegramUserId());
         assertEquals("Aruzhan Arman", member.getDisplayName());
+        assertEquals("old_name", member.getTelegramUsername());
+        user.setUserName("new_name");
+        assertEquals("new_name", registrationService.registerMember(-100123456789L, "Dostar Flat", user)
+                .getTelegramUsername());
     }
 }

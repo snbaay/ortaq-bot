@@ -7,6 +7,7 @@ import kz.homebot.service.ExpenseSplitter;
 import kz.homebot.service.MoneyFormatter;
 import kz.homebot.service.NextCookPicker;
 import kz.homebot.service.DigestPolicy;
+import kz.homebot.service.ChoreAge;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -47,4 +48,7 @@ public class LogicConfig {
     public DigestPolicy digestPolicy() {
         return new DigestPolicy();
     }
+
+    @Bean
+    public ChoreAge choreAge() { return new ChoreAge(); }
 }

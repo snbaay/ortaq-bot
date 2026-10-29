@@ -11,7 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ExpenseService {
@@ -49,6 +52,75 @@ public class ExpenseService {
         }
 
         return new ExpenseResult(expense, members, shares);
+    }
+
+    /**
+     * Saves a settlement (repayment).
+     * The payer is who paid back, and the single share belongs to the recipient for the full amount.
+     */
+    @Transactional
+    public Expense recordRepayment(Household household, Member payer, Member recipient, BigDecimal amount, String description) {
+        if (household == null || payer == null || recipient == null
+                || !household.getId().equals(payer.getHousehold().getId())
+                || !household.getId().equals(recipient.getHousehold().getId())
+                || payer.getId().equals(recipient.getId())
+                || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0
+                || amount.compareTo(new BigDecimal("100000000")) > 0 || amount.scale() > 2) {
+            throw new IllegalArgumentException("Invalid repayment");
+        }
+        Expense expense = new Expense(household, payer, amount.setScale(2), description,
+                LocalDateTime.now(ZoneId.of("Asia/Almaty")), false, true);
+        expense = expenseRepository.save(expense);
+
+        ExpenseShare share = new ExpenseShare(expense, recipient, amount);
+        expenseShareRepository.save(share);
+
+        return expense;
+    }
+
+    /**
+     * Returns the last 10 non-deleted entries (expenses and repayments).
+     */
+    @Transactional(readOnly = true)
+    public List<Expense> getHistory(Household household) {
+        return expenseRepository.findTop10ByHouseholdAndDeletedFalseOrderByIdDesc(household);
+    }
+
+    /**
+     * Soft-deletes the sender's last non-deleted entry.
+     */
+    @Transactional
+    public Optional<Expense> deleteLastEntry(Household household, Member member) {
+        Optional<Expense> last = expenseRepository.findFirstByHouseholdAndPayerAndDeletedFalseOrderByIdDesc(household, member);
+        last.ifPresent(e -> {
+            e.setDeleted(true);
+            expenseRepository.save(e);
+        });
+        return last;
+    }
+
+    public enum DeleteResult {
+        SUCCESS,
+        NOT_FOUND,
+        NOT_OWNER
+    }
+
+    /**
+     * Soft-deletes an entry by ID, only if it belongs to the given household and the payer is the sender.
+     */
+    @Transactional
+    public DeleteResult deleteEntryById(Household household, Member member, Long id) {
+        Optional<Expense> opt = expenseRepository.findByIdAndHousehold(id, household);
+        if (opt.isEmpty() || opt.get().isDeleted()) {
+            return DeleteResult.NOT_FOUND;
+        }
+        Expense expense = opt.get();
+        if (!expense.getPayer().getId().equals(member.getId())) {
+            return DeleteResult.NOT_OWNER;
+        }
+        expense.setDeleted(true);
+        expenseRepository.save(expense);
+        return DeleteResult.SUCCESS;
     }
 
     /** Result DTO carrying the saved expense, member list and their shares (same order). */

@@ -41,20 +41,28 @@ public class Expense {
     @Column(name = "deleted", nullable = false)
     private boolean deleted = false;
 
+    @Column(name = "settlement", nullable = false)
+    private boolean settlement = false;
+
     public Expense() {
     }
 
     public Expense(Household household, Member payer, BigDecimal amount, String description) {
-        this(household, payer, amount, description, LocalDateTime.now(), false);
+        this(household, payer, amount, description, LocalDateTime.now(), false, false);
     }
 
     public Expense(Household household, Member payer, BigDecimal amount, String description, LocalDateTime createdAt, boolean deleted) {
+        this(household, payer, amount, description, createdAt, deleted, false);
+    }
+
+    public Expense(Household household, Member payer, BigDecimal amount, String description, LocalDateTime createdAt, boolean deleted, boolean settlement) {
         this.household = household;
         this.payer = payer;
         this.amount = amount;
         this.description = description;
         this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
         this.deleted = deleted;
+        this.settlement = settlement;
     }
 
     public Long getId() {
@@ -111,5 +119,13 @@ public class Expense {
 
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
+    }
+
+    public boolean isSettlement() {
+        return settlement;
+    }
+
+    public void setSettlement(boolean settlement) {
+        this.settlement = settlement;
     }
 }

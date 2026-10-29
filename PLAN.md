@@ -290,7 +290,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 &#x20; - Commit: `feat: balances and debt calculator`.
 
-\- \[ ] \*\*A4. Repayments, history, undo.\*\* `/tolem`, `/tarih`, `/oshiru`.
+\- \[x] \*\*A4. Repayments, history, undo.\*\* `/tolem`, `/tarih`, `/oshiru`.
 
 &#x20; - `/tolem <name> <amount>`: the sender paid back money. Find the recipient by display name (case-insensitive prefix match). If the household has exactly 2 members the name may be omitted. Not found or ambiguous → reply with the member names. Reject: recipient = sender, amount ≤ 0, more than 2 decimals. Store as a settlement expense (section 4). Reply `Берік Асанға 600 ₸ төледі ✅` and then show the updated `/qaryz`.
 

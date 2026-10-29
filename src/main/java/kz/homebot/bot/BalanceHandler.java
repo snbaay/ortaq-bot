@@ -85,12 +85,15 @@ public class BalanceHandler implements CommandHandler {
     }
 
     private void handleQaryz(CommandContext ctx, Household household) {
+        ctx.reply(buildQaryzText(household));
+    }
+
+    public String buildQaryzText(Household household) {
         Map<Long, BigDecimal> balances = balanceService.getBalances(household);
         List<DebtCalculator.Transfer> transfers = debtCalculator.calculate(balances);
 
         if (transfers.isEmpty()) {
-            ctx.reply(messageService.getMessage("debts.allEven"));
-            return;
+            return messageService.getMessage("debts.allEven");
         }
 
         Map<Long, Member> memberMap = memberRepository.findByHousehold(household).stream()
@@ -110,6 +113,6 @@ public class BalanceHandler implements CommandHandler {
               .append(moneyFormatter.format(t.amount()))
               .append("\n");
         }
-        ctx.reply(sb.toString().trim());
+        return sb.toString().trim();
     }
 }

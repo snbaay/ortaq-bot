@@ -328,7 +328,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 \- \[x] \*\*B2. Daily digest.\*\* Pure `DigestPolicy.shouldSend(LocalDateTime nowAlmaty, LocalDate lastDigestDate)` → true if local time ≥ 09:00 and `lastDigestDate` is not today (tests first: before 09:00, at 09:00, after 09:00, already sent today, null last date, after midnight). A `@Scheduled(fixedRate = 15 min)` job (`@EnableScheduling`) checks every household and sends ONE message: `☀️ Қайырлы таң! Бүгін тамақты {name} жасайды 🍲` (just the cook for now), then sets `lastDigestDate`. If a chat is unreachable, log a warning and continue with the others. This design survives restarts and short downtime. Commit: `feat: daily digest`.
 
-\- \[ ] \*\*B3. Shopping list.\*\* `ShoppingItem`, `ShoppingService`, `ShoppingHandler`. `/tizim` shows open items with `#id`. `/tizim сүт, нан, жұмыртқа` adds 3 items. `/satyp 12` marks #12 as bought (hidden from the list afterwards, kept in the DB; only items of the same household). Limits: item text max 60 chars, max 50 open items. Tests for add/bought/limits. Commit: `feat: shopping list`.
+\- \[x] \*\*B3. Shopping list.\*\* `ShoppingItem`, `ShoppingService`, `ShoppingHandler`. `/tizim` shows open items with `#id`. `/tizim сүт, нан, жұмыртқа` adds 3 items. `/satyp 12` marks #12 as bought (hidden from the list afterwards, kept in the DB; only items of the same household). Limits: item text max 60 chars, max 50 open items. Tests for add/bought/limits. Commit: `feat: shopping list`.
 
 \- \[ ] \*\*B4. Shared notes.\*\* `/jazba` shows the last 10 notes (`#id text — author`). `/jazba <text>` adds a note (max 300 chars). `/jazba\_oshiru <id>` soft-deletes a note of the same household. Tests. Commit: `feat: shared notes`.
 

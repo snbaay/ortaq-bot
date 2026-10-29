@@ -24,11 +24,15 @@ public class DigestJob {
     private final DigestPolicy policy;
     private final MessageService messages;
     private final TelegramClient client;
+    private final DeadlineService deadlines;
+    private final PaymentCountdown countdown;
 
     public DigestJob(HouseholdRepository households, MemberRepository members, CookingRotationService rotation,
-                     DigestPolicy policy, MessageService messages, @Value("${bot.token}") String botToken) {
+                     DigestPolicy policy, MessageService messages, DeadlineService deadlines,
+                     PaymentCountdown countdown, @Value("${bot.token}") String botToken) {
         this.households = households; this.members = members; this.rotation = rotation;
-        this.policy = policy; this.messages = messages; this.client = new OkHttpTelegramClient(botToken);
+        this.policy = policy; this.messages = messages; this.deadlines = deadlines;
+        this.countdown = countdown; this.client = new OkHttpTelegramClient(botToken);
     }
 
     @Scheduled(fixedRate = 900000, initialDelay = 900000)
@@ -41,8 +45,18 @@ public class DigestJob {
             }
             try {
                 var cook = rotation.getOrCreateDuty(household, now.toLocalDate()).getMember();
+                StringBuilder text = new StringBuilder(messages.getMessage("digest.morning", cook.getDisplayName()));
+                for (var deadline : deadlines.upcoming(household, now.toLocalDate())) {
+                    long days = countdown.daysLeft(now.toLocalDate(), deadline.getDayOfMonth());
+                    if (days == 0 || days == 1 || days == 3) {
+                        String remaining = days == 0 ? messages.getMessage("deadline.today")
+                                : days == 1 ? messages.getMessage("deadline.tomorrow")
+                                : messages.getMessage("deadline.days", days);
+                        text.append("\n").append(messages.getMessage("deadline.reminder", deadline.getTitle(), remaining));
+                    }
+                }
                 client.execute(SendMessage.builder().chatId(household.getTelegramChatId())
-                        .text(messages.getMessage("digest.morning", cook.getDisplayName())).build());
+                        .text(text.toString()).build());
                 household.setLastDigestDate(now.toLocalDate());
                 households.save(household);
             } catch (TelegramApiException e) {

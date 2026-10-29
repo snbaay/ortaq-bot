@@ -5,6 +5,7 @@ import kz.homebot.service.DebtCalculator;
 import kz.homebot.service.ExpenseParser;
 import kz.homebot.service.ExpenseSplitter;
 import kz.homebot.service.MoneyFormatter;
+import kz.homebot.service.NextCookPicker;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -34,5 +35,10 @@ public class LogicConfig {
     @Bean
     public MoneyFormatter moneyFormatter() {
         return new MoneyFormatter();
+    }
+
+    @Bean
+    public NextCookPicker nextCookPicker() {
+        return new NextCookPicker();
     }
 }

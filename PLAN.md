@@ -314,7 +314,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 
 
-\- \[ ] \*\*B1. Cooking rota.\*\* Pure `NextCookPicker` (tests first, ≥5: first day, normal step, wrap-around, member list grew, previous cook no longer in the list), `CookingRotationService`, `CookingHandler`.
+\- \[x] \*\*B1. Cooking rota.\*\* Pure `NextCookPicker` (tests first, ≥5: first day, normal step, wrap-around, member list grew, previous cook no longer in the list), `CookingRotationService`, `CookingHandler`.
 
 &#x20; - Members cook one per day in registration order (by member id).
 

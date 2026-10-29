@@ -330,7 +330,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 \- \[x] \*\*B3. Shopping list.\*\* `ShoppingItem`, `ShoppingService`, `ShoppingHandler`. `/tizim` shows open items with `#id`. `/tizim сүт, нан, жұмыртқа` adds 3 items. `/satyp 12` marks #12 as bought (hidden from the list afterwards, kept in the DB; only items of the same household). Limits: item text max 60 chars, max 50 open items. Tests for add/bought/limits. Commit: `feat: shopping list`.
 
-\- \[ ] \*\*B4. Shared notes.\*\* `/jazba` shows the last 10 notes (`#id text — author`). `/jazba <text>` adds a note (max 300 chars). `/jazba\_oshiru <id>` soft-deletes a note of the same household. Tests. Commit: `feat: shared notes`.
+\- \[x] \*\*B4. Shared notes.\*\* `/jazba` shows the last 10 notes (`#id text — author`). `/jazba <text>` adds a note (max 300 chars). `/jazba\_oshiru <id>` soft-deletes a note of the same household. Tests. Commit: `feat: shared notes`.
 
 \- \[ ] \*\*B5. Chore log.\*\* `/is <text>` logs a chore for the sender (max 100 chars). `/ister` shows the last 10 (`date — name: text`). `/songy <text>` finds the most recent entry containing the text (case-insensitive) and answers like `Соңғы рет: 12 қазан, Асан — су сүзгісі (5 күн бұрын)`; no match → short message. Tests for the lookup and for "days ago" (pure function). Commit: `feat: chore log`.
 

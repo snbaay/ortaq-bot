@@ -19,7 +19,7 @@
    Calendar decisions use `Asia/Almaty` explicitly. Monthly reports query timestamps from the first instant of the chosen local month to the first instant of the next month.
 
 7. **How is a duplicate morning digest avoided?**  
-   Each household stores `lastDigestDate`. The scheduler sends only after 09:00 local time and only when that date differs from today. It writes the date after a successful send. Multiple concurrent instances would need a database lock or atomic claim.
+   Each household stores `lastDigestDate`. The scheduler sends only after 09:00 local time and only when that date differs from today. It writes the date after a successful send. It reads that weekday's cooks from a repeating schedule, applies swaps for today, and skips cooking text on days off. Multiple concurrent instances would need a database lock or atomic claim.
 
 8. **What happens when a command fails?**  
    `CommandRouter` catches handler exceptions, logs the command and chat context, and replies with a generic Kazakh error. One bad update does not stop polling.

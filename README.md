@@ -1,6 +1,6 @@
 # Ortaq
 
-Ortaq is a Telegram bot for roommates sharing a household. One Telegram group is one household. The bot records expenses and repayments, calculates balances and simplified transfers, rotates cooking duty, and keeps small shared lists. Its messages and command menu are in Kazakh.
+Ortaq is a Telegram bot for roommates sharing a household. One Telegram group is one household. The bot records expenses and repayments, calculates balances and simplified transfers, keeps a fixed weekly cooking schedule, and manages small shared lists. Its messages and command menu are in Kazakh.
 
 ## Commands
 
@@ -16,8 +16,10 @@ Ortaq is a Telegram bot for roommates sharing a household. One Telegram group is
 | `/oshiru` or `/oshiru 12` | Undo your last entry or your entry by ID |
 | `/tarih` | Show the last 10 expenses and repayments |
 | `/esep` or `/esep 9` | Show this month's or September's report |
-| `/kezek` | Show today's cook and the next three days |
-| `/otkizu` | Pass today's cooking turn to the next member |
+| `/kezek` | Show today's cooks and the whole weekly schedule |
+| `/kezek_qoyu дүйсенбі @user1 @user2` | Replace Monday's cooks; multiple weekday lines are accepted, `жексенбі: -` sets a day off |
+| `/kezek_tazalau` | Clear the weekly cooking schedule |
+| `/otkizu @user` | Hand your cooking turn to someone else for today only |
 | `/dayyn` | Announce that food is ready |
 | `/tizim` or `/tizim сүт, нан` | Show or add shopping items |
 | `/satyp 12` | Mark a shopping item as bought |
@@ -79,6 +81,8 @@ The default `dev` profile uses a file-based H2 database in `./data/homebot`. Tes
 Each expense adds its full amount to the payer's balance and subtracts each participant's share. Repayments use the same ledger with one recipient. The `DebtCalculator` repeatedly pairs the person who owes the most with the person owed the most, transfers the smaller of those amounts, and repeats until all balances reach zero. For example, if A is owed 900 ₸ while B owes 600 ₸ and C owes 300 ₸, it suggests B → A: 600 ₸ and C → A: 300 ₸. Ties use member ID for repeatable results.
 
 Money uses `BigDecimal` to preserve tiyn. Deletions are soft so ledger rows remain auditable. Dates use `Asia/Almaty`; the daily digest stores its last sent date in the household row so a restart does not repeat the day's message.
+
+Cooking assignments repeat by weekday. A day can have any number of cooks; no assignment means a day off. `/kezek_qoyu` replaces only the days you list, and rejects the entire update if any name cannot be resolved. `/otkizu` records a replacement for one date. The morning digest mentions scheduled cooks by `@username` when available and still sends payment reminders on days off.
 
 ## Deployment and limitations
 

@@ -1,10 +1,10 @@
 package kz.homebot.service;
 
 import kz.homebot.repository.HouseholdRepository;
-import kz.homebot.repository.MemberRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
@@ -13,39 +13,50 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.stream.Collectors;
 
 @Component
 public class DigestJob {
     private static final Logger log = LoggerFactory.getLogger(DigestJob.class);
     private static final ZoneId ALMATY = ZoneId.of("Asia/Almaty");
     private final HouseholdRepository households;
-    private final MemberRepository members;
-    private final CookingRotationService rotation;
+    private final CookingScheduleService schedules;
     private final DigestPolicy policy;
     private final MessageService messages;
     private final TelegramClient client;
     private final DeadlineService deadlines;
     private final PaymentCountdown countdown;
 
-    public DigestJob(HouseholdRepository households, MemberRepository members, CookingRotationService rotation,
+    @Autowired
+    public DigestJob(HouseholdRepository households, CookingScheduleService schedules,
                      DigestPolicy policy, MessageService messages, DeadlineService deadlines,
                      PaymentCountdown countdown, @Value("${bot.token}") String botToken) {
-        this.households = households; this.members = members; this.rotation = rotation;
+        this(households, schedules, policy, messages, deadlines, countdown, new OkHttpTelegramClient(botToken));
+    }
+
+    public DigestJob(HouseholdRepository households, CookingScheduleService schedules,
+                     DigestPolicy policy, MessageService messages, DeadlineService deadlines,
+                     PaymentCountdown countdown, TelegramClient client) {
+        this.households = households; this.schedules = schedules;
         this.policy = policy; this.messages = messages; this.deadlines = deadlines;
-        this.countdown = countdown; this.client = new OkHttpTelegramClient(botToken);
+        this.countdown = countdown; this.client = client;
     }
 
     @Scheduled(fixedRate = 900000, initialDelay = 900000)
     public void sendDueDigests() {
         LocalDateTime now = LocalDateTime.now(ALMATY);
         for (var household : households.findAll()) {
-            if (!policy.shouldSend(now, household.getLastDigestDate())
-                    || members.findByHousehold(household).size() < 2) {
+            if (!policy.shouldSend(now, household.getLastDigestDate())) {
                 continue;
             }
             try {
-                var cook = rotation.getOrCreateDuty(household, now.toLocalDate()).getMember();
-                StringBuilder text = new StringBuilder(messages.getMessage("digest.morning", cook.getDisplayName()));
+                var cooks = schedules.effectiveCooks(household, now.toLocalDate());
+                StringBuilder text = new StringBuilder(cooks.isEmpty()
+                        ? messages.getMessage("digest.morningNoCooking")
+                        : messages.getMessage("digest.morning", cooks.stream()
+                                .map(m -> m.getTelegramUsername() == null || m.getTelegramUsername().isBlank()
+                                        ? m.getDisplayName() : "@" + m.getTelegramUsername())
+                                .collect(Collectors.joining(", "))));
                 for (var deadline : deadlines.upcoming(household, now.toLocalDate())) {
                     long days = countdown.daysLeft(now.toLocalDate(), deadline.getDayOfMonth());
                     if (days == 0 || days == 1 || days == 3) {

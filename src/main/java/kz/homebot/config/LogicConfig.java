@@ -5,7 +5,14 @@ import kz.homebot.service.DebtCalculator;
 import kz.homebot.service.ExpenseParser;
 import kz.homebot.service.ExpenseSplitter;
 import kz.homebot.service.MoneyFormatter;
-import kz.homebot.service.NextCookPicker;
+import kz.homebot.service.WeekdayParser;
+import kz.homebot.service.ScheduleTextParser;
+import kz.homebot.service.EffectiveCooks;
+import kz.homebot.service.MessageService;
+import java.time.DayOfWeek;
+import java.util.EnumMap;
+import java.util.Locale;
+import java.util.Map;
 import kz.homebot.service.DigestPolicy;
 import kz.homebot.service.ChoreAge;
 import kz.homebot.service.PaymentCountdown;
@@ -42,9 +49,21 @@ public class LogicConfig {
     }
 
     @Bean
-    public NextCookPicker nextCookPicker() {
-        return new NextCookPicker();
+    public WeekdayParser weekdayParser(MessageService messages) {
+        Map<DayOfWeek, String> aliases = new EnumMap<>(DayOfWeek.class);
+        for (DayOfWeek day : DayOfWeek.values()) {
+            aliases.put(day, messages.getMessage("weekday.alias." + day.name().toLowerCase(Locale.ROOT)));
+        }
+        return new WeekdayParser(aliases);
     }
+
+    @Bean
+    public ScheduleTextParser scheduleTextParser(WeekdayParser weekdays) {
+        return new ScheduleTextParser(weekdays);
+    }
+
+    @Bean
+    public EffectiveCooks effectiveCooks() { return new EffectiveCooks(); }
 
     @Bean
     public DigestPolicy digestPolicy() {

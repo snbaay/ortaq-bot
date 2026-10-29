@@ -27,7 +27,13 @@ public class CommandParser {
         }
 
         // Split into the command token (first word) and the remainder (arguments)
-        int spaceIndex = trimmed.indexOf(' ');
+        int spaceIndex = -1;
+        for (int i = 0; i < trimmed.length(); i++) {
+            if (Character.isWhitespace(trimmed.charAt(i))) {
+                spaceIndex = i;
+                break;
+            }
+        }
         String commandToken;
         String args;
 

@@ -28,6 +28,14 @@ class CommandParserTest {
     }
 
     @Test
+    void multilineScheduleArgumentsArePreserved() {
+        var result = parser.parse("/kezek_qoyu\nдүйсенбі: @one\nсейсенбі: @two", botUsername);
+        assertThat(result).isPresent();
+        assertThat(result.get().command()).isEqualTo("kezek_qoyu");
+        assertThat(result.get().args()).isEqualTo("дүйсенбі: @one\nсейсенбі: @two");
+    }
+
+    @Test
     void ignoreCommandAddressedToOtherBot() {
         Optional<CommandParser.ParsedCommand> result = parser.parse("/cmd@OtherBot test", botUsername);
         assertThat(result).isEmpty();

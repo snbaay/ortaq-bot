@@ -86,7 +86,7 @@ Ortaq (ортақ = "shared") is a Telegram bot for roommates. One Telegram grou
 
 \- Junior-friendly code: small classes, constructor injection, Java `record` for simple data, no interface with a single implementation, no over-engineering.
 
-\- \*\*Pure classes\*\* (no Spring, no JPA, no I/O, easy to unit test): `ExpenseSplitter`, `ExpenseParser`, `DebtCalculator`, `MoneyFormatter`, `CommandParser`, `NextCookPicker`, `DigestPolicy`, `PaymentCountdown`, `RandomPicker`. Keep them annotation-free and expose them as beans in one `@Configuration` class (`LogicConfig`).
+\- \*\*Pure classes\*\* (no Spring, no JPA, no I/O, easy to unit test): `ExpenseSplitter`, `ExpenseParser`, `DebtCalculator`, `MoneyFormatter`, `CommandParser`, `WeekdayParser`, `ScheduleTextParser`, `EffectiveCooks`, `DigestPolicy`, `PaymentCountdown`, `RandomPicker`. Keep them annotation-free and expose them as beans in one `@Configuration` class (`LogicConfig`).
 
 \- All Kazakh text lives ONLY in `src/main/resources/messages\_kk.properties` (UTF-8), read through `MessageService`. No Kazakh string literals in Java. Key style: `area.action.result`, e.g. `expense.added`.
 
@@ -140,9 +140,13 @@ Ortaq (ортақ = "shared") is a Telegram bot for roommates. One Telegram grou
 
 | `/esep` | Айлық есеп | Monthly report. |
 
-| `/kezek` | Бүгін кім тамақ жасайды | Today's cook + next 3 days. |
+| `/kezek` | Апталық ас кезегі | Today's cooks and the whole weekly schedule. |
 
-| `/otkizu` | Кезекті өткізу | Skip today's turn. |
+| `/kezek_qoyu` | Кезек кестесін белгілеу | Replace the listed weekdays' cooks; `-` marks a day off. |
+
+| `/kezek_tazalau` | Кестені тазалау | Clear the household's weekly cooking schedule. |
+
+| `/otkizu` | Бүгінгі кезекті беру | `/otkizu @user` hands the sender's turn to that person for today only. |
 
 | `/dayyn` | Ас дайын | "Food is ready" announcement to the group. |
 
@@ -204,7 +208,9 @@ Sample messages (write the rest in the same style):
 
 \- \*\*ExpenseShare\*\*: id, expense, member, shareAmount.
 
-\- \*\*CookingDuty\*\*: id, household, member, dutyDate (LocalDate). Unique (household, dutyDate).
+\- \*\*CookingSchedule\*\*: id, household, dayOfWeek (STRING), member. Unique (household, dayOfWeek, member). No rows means a day off.
+
+\- \*\*CookingSwap\*\*: id, household, date, fromMember, toMember. A one-day replacement.
 
 \- \*\*ShoppingItem\*\*: id, household, text, addedBy, addedAt, bought, boughtBy (nullable), boughtAt (nullable).
 
@@ -394,7 +400,13 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 
 
-\*\*After F2: `git push`. The plan is complete.\*\*
+\*\*After F2: `git push`.\*\*
+
+\### Phase G — Weekly cooking schedule
+
+\- \[x] \*\*G1. Weekly cooking schedule.\*\* Replace the daily rotation with a fixed schedule by weekday. Add `CookingSchedule` (household, `DayOfWeek` as STRING, member; unique together) and `CookingSwap` (household, date, fromMember, toMember). No schedule rows for a day means a day off. Remove unused rotation classes and tests. Pure `WeekdayParser`, `ScheduleTextParser`, and `EffectiveCooks` with tests first. `/kezek_qoyu` accepts one or multiple weekday lines and atomically replaces only listed days; resolve cooks by @username or case-insensitive display-name prefix, reject unknown or ambiguous names with a member list. `/kezek` shows today's effective cooks and the full week, marking today and day offs. `/otkizu @user` swaps only the sender's turn today; reject senders who are not cooking. `/kezek_tazalau` clears the schedule; keep `/dayyn`. Daily digest mentions today's cooks by username when available, says nothing about cooking on a day off, and retains payment reminders and once-per-day delivery. Update Kazakh messages, menu, help, README and docs. Test services; run quiet tests. Commit: `feat: weekly cooking schedule`.
+
+\*\*After G1: `git push` to `dev`. The plan is complete.\*\*
 
 
 

@@ -26,7 +26,7 @@ As of October 2026, [Neon says](https://neon.com/blog/neon-free-plan-1-gb-per-pr
    | `PORT` | `8080` or Render's provided port |
    | `ALLOWED_CHAT_IDS` | Optional comma-separated Telegram group IDs |
 
-4. Deploy. Open `https://<service>.onrender.com/health` and expect `OK`. Check the Render logs for successful startup, then add the bot to a Telegram group and try `/start`, `/komek`, and `/shygyn 630 су`.
+4. Deploy. Open `https://<service>.onrender.com/health` and expect `OK`. Check the Render logs for successful startup, then add the bot to a Telegram group and try `/start`, `/komek`, `/shygyn 630 су`, and `/kezek_qoyu дүйсенбі @username` followed by `/kezek`.
 
 Disable privacy mode for the production bot in BotFather (`/setprivacy`) if you want plain messages such as `630 су` to be recorded. Each roommate must send a message before they are included in a split.
 

@@ -23,7 +23,7 @@ class FullFlowTest {
     @Autowired ExpenseService expenses;
     @Autowired BalanceService balances;
     @Autowired DebtCalculator debts;
-    @Autowired CookingRotationService cooking;
+    @Autowired CookingScheduleService cooking;
     @Autowired PaymentCountdown countdown;
 
     @Test void householdFlow() {
@@ -43,12 +43,18 @@ class FullFlowTest {
                 .isEqualTo(ExpenseService.DeleteResult.SUCCESS);
         assertThat(balances.getBalances(home).get(dana.getId())).isEqualByComparingTo("-300.00");
 
-        LocalDate day = LocalDate.of(2026, 10, 29);
-        assertThat(cooking.getOrCreateDuty(home, day).getMember().getId()).isEqualTo(asan.getId());
-        assertThat(cooking.getOrCreateDuty(home, day.plusDays(1)).getMember().getId()).isEqualTo(berik.getId());
-        assertThat(cooking.getOrCreateDuty(home, day.plusDays(2)).getMember().getId()).isEqualTo(dana.getId());
-        assertThat(cooking.getOrCreateDuty(home, day.plusDays(3)).getMember().getId()).isEqualTo(asan.getId());
-        assertThat(cooking.getOrCreateDuty(home, day.plusDays(4)).getMember().getId()).isEqualTo(berik.getId());
-        assertThat(countdown.daysLeft(day, 31)).isEqualTo(2);
+        LocalDate monday = LocalDate.of(2026, 11, 2);
+        cooking.setSchedule(home, "mon Asan Berik\ntue Dana\nsun -");
+        assertThat(cooking.effectiveCooks(home, monday)).extracting(Member::getId)
+                .containsExactly(asan.getId(), berik.getId());
+        assertThat(cooking.effectiveCooks(home, monday.plusDays(1))).extracting(Member::getId)
+                .containsExactly(dana.getId());
+        cooking.handOver(home, monday, asan, "Dana");
+        assertThat(cooking.effectiveCooks(home, monday)).extracting(Member::getId)
+                .containsExactly(berik.getId(), dana.getId());
+        assertThat(cooking.effectiveCooks(home, monday.plusWeeks(1))).extracting(Member::getId)
+                .containsExactly(asan.getId(), berik.getId());
+        assertThat(cooking.effectiveCooks(home, monday.plusDays(6))).isEmpty();
+        assertThat(countdown.daysLeft(LocalDate.of(2026, 10, 29), 31)).isEqualTo(2);
     }
 }

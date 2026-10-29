@@ -42,7 +42,7 @@ public class CommandRouter {
         try {
             handler.handle(ctx);
         } catch (Exception e) {
-            log.error("Error executing command /{} in chat {}: {}", cmd, ctx.chatId(), e.getMessage(), e);
+            log.error("Error executing command /{} in chat {}", cmd, ctx.chatId(), e);
             ctx.reply(messageService.getMessage("error.generic"));
         }
         return true;

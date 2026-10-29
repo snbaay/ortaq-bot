@@ -1,9 +1,7 @@
 package kz.homebot.repository;
 
-import kz.homebot.domain.Expense;
 import kz.homebot.domain.ExpenseShare;
 import kz.homebot.domain.Household;
-import kz.homebot.domain.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,8 +13,6 @@ import java.time.LocalDateTime;
 
 @Repository
 public interface ExpenseShareRepository extends JpaRepository<ExpenseShare, Long> {
-    List<ExpenseShare> findByExpense(Expense expense);
-    List<ExpenseShare> findByMember(Member member);
 
     /**
      * Returns [memberId, totalShareAmount] for each member in a household (non-deleted expenses).

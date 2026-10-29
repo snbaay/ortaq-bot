@@ -115,7 +115,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             telegramClient.execute(SetMyCommands.builder().commands(commands).build());
             log.info("Telegram command menu registered successfully for @{}", botUsername);
         } catch (TelegramApiException e) {
-            log.error("Failed to register bot commands menu: {}", e.getMessage());
+            log.error("Failed to register bot commands menu: {}", e.getClass().getSimpleName());
         }
     }
 
@@ -191,14 +191,14 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         } else if (last != null && !last.isBlank()) {
             return last.trim();
         }
-        return "Пайдаланушы";
+        return messageService.getMessage("member.defaultName");
     }
 
     private void send(Long chatId, String text) {
         try {
             telegramClient.execute(SendMessage.builder().chatId(chatId).text(text).build());
         } catch (TelegramApiException e) {
-            log.error("Failed to send message to {}: {}", chatId, e.getMessage());
+            log.error("Failed to send message to {}: {}", chatId, e.getClass().getSimpleName());
         }
     }
 }

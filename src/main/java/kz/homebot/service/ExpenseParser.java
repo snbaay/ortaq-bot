@@ -7,7 +7,7 @@ import kz.homebot.config.Limits;
 /**
  * Pure Java class. Parses a raw text string into an amount + description.
  * Accepts "." and "," as decimal separator, spaces inside number.
- * Valid: "630 су", "2 500,50 хлеб", "/shygyn 630 су"
+ * Valid examples: "630 water", "2 500,50 bread".
  */
 public class ExpenseParser {
 

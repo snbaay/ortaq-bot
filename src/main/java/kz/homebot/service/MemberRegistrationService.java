@@ -20,10 +20,13 @@ public class MemberRegistrationService {
 
     private final HouseholdRepository householdRepository;
     private final MemberRepository memberRepository;
+    private final MessageService messages;
 
-    public MemberRegistrationService(HouseholdRepository householdRepository, MemberRepository memberRepository) {
+    public MemberRegistrationService(HouseholdRepository householdRepository, MemberRepository memberRepository,
+                                     MessageService messages) {
         this.householdRepository = householdRepository;
         this.memberRepository = memberRepository;
+        this.messages = messages;
     }
 
     @Transactional
@@ -36,7 +39,8 @@ public class MemberRegistrationService {
                                  String lastName, String username) {
         Household household = householdRepository.findByTelegramChatId(telegramChatId)
                 .orElseGet(() -> {
-                    String title = (chatTitle != null && !chatTitle.isBlank()) ? chatTitle.trim() : "Ортақ үй";
+                    String title = (chatTitle != null && !chatTitle.isBlank())
+                            ? chatTitle.trim() : messages.getMessage("household.defaultTitle");
                     Household newHousehold = new Household(telegramChatId, title, LocalDateTime.now());
                     return householdRepository.save(newHousehold);
                 });
@@ -74,16 +78,6 @@ public class MemberRegistrationService {
                 telegramUser.getLastName(), telegramUser.getUserName());
     }
 
-    @Transactional
-    public Member registerOrGet(Long telegramChatId, String chatTitle, Long telegramUserId, String firstName, String lastName) {
-        return registerMember(telegramChatId, chatTitle, telegramUserId, firstName, lastName);
-    }
-
-    @Transactional
-    public Member registerOrGet(Long telegramChatId, String chatTitle, User telegramUser) {
-        return registerMember(telegramChatId, chatTitle, telegramUser);
-    }
-
     private String buildDisplayName(String firstName, String lastName) {
         boolean hasFirst = firstName != null && !firstName.isBlank();
         boolean hasLast = lastName != null && !lastName.isBlank();
@@ -95,7 +89,7 @@ public class MemberRegistrationService {
         } else if (hasLast) {
             return lastName.trim();
         } else {
-            return "Пайдаланушы";
+            return messages.getMessage("member.defaultName");
         }
     }
 }

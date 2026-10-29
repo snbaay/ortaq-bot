@@ -360,7 +360,7 @@ Compiles, quiet test run passes, no Kazakh literals in Java, `git status` is cle
 
 \- \[x] \*\*D2. Full-flow test.\*\* One `@SpringBootTest` scenario on H2 using services directly (no Telegram): register 3 members; add expenses (equal split and mention split); check balances and `/qaryz` transfers; repay; undo; check balances again; cooking rota across 5 days; deadline countdown. Commit: `test: full flow scenario`.
 
-\- \[ ] \*\*D3. Cleanup pass.\*\* Search Java files for Kazakh literals and move them to `messages\_kk.properties`; remove unused message keys and dead code; make sure every command in section 3 is registered in the menu and described in `/komek`; check logs do not contain secrets. Commit: `chore: cleanup`.
+\- \[x] \*\*D3. Cleanup pass.\*\* Search Java files for Kazakh literals and move them to `messages\_kk.properties`; remove unused message keys and dead code; make sure every command in section 3 is registered in the menu and described in `/komek`; check logs do not contain secrets. Commit: `chore: cleanup`.
 
 
 

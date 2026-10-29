@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @DataJpaTest
-@Import(MemberRegistrationService.class)
+@Import({MemberRegistrationService.class, kz.homebot.service.MessageService.class, kz.homebot.config.AppConfig.class})
 class MemberRegistrationServiceTest {
 
     @Autowired

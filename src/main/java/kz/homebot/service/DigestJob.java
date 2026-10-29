@@ -60,9 +60,9 @@ public class DigestJob {
                 household.setLastDigestDate(now.toLocalDate());
                 households.save(household);
             } catch (TelegramApiException e) {
-                log.warn("Digest delivery failed for chat {}: {}", household.getTelegramChatId(), e.getMessage());
+                log.warn("Digest delivery failed for chat {}: {}", household.getTelegramChatId(), e.getClass().getSimpleName());
             } catch (Exception e) {
-                log.warn("Digest failed for chat {}: {}", household.getTelegramChatId(), e.getMessage());
+                log.warn("Digest failed for chat {}: {}", household.getTelegramChatId(), e.getClass().getSimpleName());
             }
         }
     }

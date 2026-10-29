@@ -16,7 +16,6 @@ import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
-    List<Expense> findByHouseholdAndDeletedFalse(Household household);
 
     List<Expense> findTop10ByHouseholdAndDeletedFalseOrderByIdDesc(Household household);
 

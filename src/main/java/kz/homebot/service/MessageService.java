@@ -17,6 +17,6 @@ public class MessageService {
     }
 
     public String getMessage(String code, Object... args) {
-        return messageSource.getMessage(code, args, KAZAKH_LOCALE);
+        return messageSource.getMessage(code, args, code, KAZAKH_LOCALE);
     }
 }

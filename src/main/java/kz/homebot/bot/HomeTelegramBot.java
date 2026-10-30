@@ -1,9 +1,11 @@
 package kz.homebot.bot;
 
-import jakarta.annotation.PostConstruct;
+import kz.homebot.service.MemberRegistrationService;
+import kz.homebot.config.AllowedChats;
 import kz.homebot.service.MessageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
@@ -13,11 +15,17 @@ import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateC
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.User;
+import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
+import jakarta.annotation.PostConstruct;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleThreadUpdateConsumer {
@@ -28,15 +36,60 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     private final String botUsername;
     private final TelegramClient telegramClient;
     private final MessageService messageService;
+    private final MemberRegistrationService memberRegistrationService;
+    private final CommandParser commandParser;
+    private final CommandRouter commandRouter;
+    private final ExpenseHandler expenseHandler;
+    private final AllowedChats allowedChats;
 
+    @Autowired
     public HomeTelegramBot(
             @Value("${bot.token}") String botToken,
             @Value("${bot.username}") String botUsername,
-            MessageService messageService) {
+            MessageService messageService,
+            MemberRegistrationService memberRegistrationService,
+            CommandParser commandParser,
+            CommandRouter commandRouter,
+            ExpenseHandler expenseHandler,
+            AllowedChats allowedChats) {
         this.botToken = botToken;
         this.botUsername = botUsername;
         this.messageService = messageService;
+        this.memberRegistrationService = memberRegistrationService;
+        this.commandParser = commandParser;
+        this.commandRouter = commandRouter;
+        this.expenseHandler = expenseHandler;
+        this.allowedChats = allowedChats;
         this.telegramClient = new OkHttpTelegramClient(botToken);
+    }
+
+    // Secondary constructor for testing (inject TelegramClient directly)
+    public HomeTelegramBot(
+            String botToken,
+            String botUsername,
+            MessageService messageService,
+            MemberRegistrationService memberRegistrationService,
+            CommandParser commandParser,
+            CommandRouter commandRouter,
+            ExpenseHandler expenseHandler,
+            TelegramClient telegramClient) {
+        this(botToken, botUsername, messageService, memberRegistrationService,
+                commandParser, commandRouter, expenseHandler, telegramClient, new AllowedChats(""));
+    }
+
+    public HomeTelegramBot(String botToken, String botUsername, MessageService messageService,
+                           MemberRegistrationService memberRegistrationService, CommandParser commandParser,
+                           CommandRouter commandRouter, ExpenseHandler expenseHandler,
+                           TelegramClient telegramClient, AllowedChats allowedChats) {
+        this.botToken = botToken;
+        this.botUsername = botUsername;
+        this.messageService = messageService;
+        this.memberRegistrationService = memberRegistrationService;
+        this.commandParser = commandParser;
+        this.commandRouter = commandRouter;
+        this.expenseHandler = expenseHandler;
+        this.allowedChats = allowedChats;
+        this.telegramClient = telegramClient;
     }
 
     @Override
@@ -52,21 +105,17 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     @PostConstruct
     public void registerCommands() {
         try {
-            List<BotCommand> commands = List.of(
-                    new BotCommand("start", messageService.getMessage("command.start.description")),
-                    new BotCommand("shygyn", messageService.getMessage("command.shygyn.description")),
-                    new BotCommand("qaryz", messageService.getMessage("command.qaryz.description")),
-                    new BotCommand("balans", messageService.getMessage("command.balans.description")),
-                    new BotCommand("tolem", messageService.getMessage("command.tolem.description")),
-                    new BotCommand("oshiru", messageService.getMessage("command.oshiru.description"))
-            );
-            SetMyCommands setMyCommands = SetMyCommands.builder()
-                    .commands(commands)
-                    .build();
-            telegramClient.execute(setMyCommands);
+            List<BotCommand> commands = new ArrayList<>();
+            for (CommandHandler handler : commandRouter.getHandlers()) {
+                for (String cmd : handler.commands()) {
+                    String desc = messageService.getMessage("command." + cmd + ".description");
+                    commands.add(new BotCommand(cmd, desc));
+                }
+            }
+            telegramClient.execute(SetMyCommands.builder().commands(commands).build());
             log.info("Telegram command menu registered successfully for @{}", botUsername);
         } catch (TelegramApiException e) {
-            log.error("Failed to register bot commands menu: {}", e.getMessage());
+            log.error("Failed to register bot commands menu: {}", e.getClass().getSimpleName());
         }
     }
 
@@ -76,31 +125,80 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             return;
         }
 
-        String text = update.getMessage().getText().trim();
-        Long chatId = update.getMessage().getChatId();
+        Message message = update.getMessage();
+        Chat chat = message.getChat();
+        String text = message.getText().trim();
+        Long chatId = message.getChatId();
+        if (!allowedChats.allows(chatId)) {
+            log.debug("Ignoring update from chat {}", chatId);
+            return;
+        }
+        String chatType = chat.getType();
 
-        if (isCommand(text, "/start")) {
-            handleStartCommand(chatId);
+        boolean isGroup = chat.isGroupChat() || chat.isSuperGroupChat()
+                || "group".equalsIgnoreCase(chatType) || "supergroup".equalsIgnoreCase(chatType);
+
+        User from = message.getFrom();
+        if (isGroup && from != null) {
+            memberRegistrationService.registerMember(chatId, chat.getTitle(), from);
+        }
+
+        Sender sender = from != null
+                ? new Sender(from.getId(), buildSenderName(from), from.getUserName())
+                : new Sender(0L, "Anonymous", null);
+
+        CommandContext ctx = new CommandContext(
+                chatId,
+                chatType,
+                sender,
+                "",
+                "",
+                message.getEntities(),
+                replyText -> send(chatId, replyText),
+                text
+        );
+
+        Optional<CommandParser.ParsedCommand> parsed = commandParser.parse(text, botUsername);
+        if (parsed.isPresent()) {
+            CommandParser.ParsedCommand cmd = parsed.get();
+            CommandContext routedCtx = new CommandContext(
+                    chatId,
+                    chatType,
+                    sender,
+                    cmd.command(),
+                    cmd.args(),
+                    message.getEntities(),
+                    replyText -> send(chatId, replyText),
+                    text
+            );
+            commandRouter.route(routedCtx);
+        } else if (isGroup && startsWithDigit(text)) {
+            expenseHandler.handlePlainExpense(ctx, text);
         }
     }
 
-    private boolean isCommand(String text, String command) {
-        if (text.equals(command)) {
-            return true;
-        }
-        return text.equalsIgnoreCase(command + "@" + botUsername);
+    private boolean startsWithDigit(String text) {
+        return !text.isEmpty() && Character.isDigit(text.charAt(0));
     }
 
-    private void handleStartCommand(Long chatId) {
-        String greeting = messageService.getMessage("bot.start.greeting");
-        SendMessage message = SendMessage.builder()
-                .chatId(chatId)
-                .text(greeting)
-                .build();
+    private String buildSenderName(User from) {
+        String first = from.getFirstName();
+        String last = from.getLastName();
+        if (first != null && last != null && !first.isBlank() && !last.isBlank()) {
+            return first.trim() + " " + last.trim();
+        } else if (first != null && !first.isBlank()) {
+            return first.trim();
+        } else if (last != null && !last.isBlank()) {
+            return last.trim();
+        }
+        return messageService.getMessage("member.defaultName");
+    }
+
+    private void send(Long chatId, String text) {
         try {
-            telegramClient.execute(message);
+            telegramClient.execute(SendMessage.builder().chatId(chatId).text(text).build());
         } catch (TelegramApiException e) {
-            log.error("Failed to send start message to chatId {}: {}", chatId, e.getMessage());
+            log.error("Failed to send message to {}: {}", chatId, e.getClass().getSimpleName());
         }
     }
 }

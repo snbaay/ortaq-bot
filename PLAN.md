@@ -1,3 +1,5 @@
+> **Historical plan:** Phases A–G and their completed checkboxes are preserved as the Ortaq 1.x record. For all Ortaq 2.0 scope and progress, use [PLAN_V2.md](PLAN_V2.md). The stricter safety or security rule always applies.
+
 \# Ortaq — Project Plan (for the coding agent)
 
 

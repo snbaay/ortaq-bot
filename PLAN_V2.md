@@ -19,7 +19,7 @@ Planning baseline: 2026-11-15, branch `dev`, clean tree before documentation edi
 | Task | Evidence | Owner / next action |
 | --- | --- | --- |
 | V2-00-01 | Need a sanitized Neon schema/row-count snapshot and tested backup/restore before production migration; never request credentials in the repo. | Human supplies backup confirmation and safe staging copy during implementation. |
-| V2-07-01 | `docs/img/aktos-reference.jpg` appeared as an untracked local file during planning; rights and approval are unconfirmed. | Human confirms provenance/permission and whether to track this reference. Core features remain unblocked. |
+| V2-07-01 | The official `docs/img/aktos-reference.jpg` is approved for this public repository; the separate model sheet and asset manifest are still pending. | Use the original unchanged when preparing V2-07 assets. Core features remain unblocked. |
 | V2-08-03 | A separate development bot/group is required for actual Telegram checks. | Human runs it with private credentials; record results only after testing. |
 
 ## Task notation
@@ -84,7 +84,7 @@ Each task line specifies **scope/files**, **DB**, **test first**, **acceptance**
 
 ### V2-07 — Ақтөс
 
-- [ ] **V2-07-01** Approve reference and asset brief. Scope: `docs/AKTOS_SPEC.md`, local `docs/img/aktos-reference.jpg` if rights permit tracking, asset manifest. DB: none. Test first: checklist review against provided image and rights; no code test. Acceptance: orange-white corgi, white chest, facial markings, ears and eyes consistently defined; no invented substitute. Manual: human visually approves reference and provenance. Commit: `docs: approve Aktos visual reference`. Depends: V2-00-01; blocks only V2-07 asset tasks.
+- [ ] **V2-07-01** Prepare reference-based model sheet and asset brief. Scope: `docs/AKTOS_SPEC.md`, approved `docs/img/aktos-reference.jpg`, asset manifest. DB: none. Test first: visual checklist against the unchanged official reference; no code test. Acceptance: model sheet records orange-white corgi, white chest, facial markings, ears and eyes consistently; no invented substitute. Manual: human approves the derived model sheet. Commit: `docs: prepare Aktos asset brief`. Depends: V2-00-01; blocks only V2-07 asset tasks.
 - [ ] **V2-07-02** Prepare and validate 12 stickers. Scope: `assets/aktos/` sources and generated files, manifest, `AKTOS_SPEC.md`. DB: none. Test first: automated dimension/size/format validation against **current official Telegram rules at implementation time**, plus visual contact sheet review. Acceptance: all 12 inventory poses match reference and meet pack requirements. Manual: human reviews contact sheet. Commit: `assets: prepare Aktos sticker set`. Depends: V2-07-01.
 - [ ] **V2-07-03** Register pack and integrate sparse sticker sends. Scope: config/manifest, sticker sender, events/localization/tests. DB: optional sticker send keys in notification table; no ledger change. Test first: event mapping, missing sticker ID fallback, suppression/rate limit, duplicate update. Acceptance: greeting/tea/ready/store/play/night/urgent/reactions mapped; no sticker on routine financial chatter. Manual: human uploads pack via BotFather and supplies IDs via config; inspect dev sends. Commit: `feat: add optional Aktos reactions`. Depends: V2-07-02, V2-06-06.
 

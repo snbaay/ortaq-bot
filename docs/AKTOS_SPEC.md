@@ -1,6 +1,6 @@
 # Ақтөс / Aktos mascot specification
 
-Ақтөс is Ortaq's friendly orange-and-white corgi, a roommate companion rather than a debt collector. The user's existing reference image is the visual source of truth. A local, **untracked** `docs/img/aktos-reference.jpg` appeared during planning and was visually inspected: it is an eight-pose sheet with Kazakh labels and the intended corgi. Its provenance and permission to add it to the public repository remain unconfirmed, so the documentation commit does not include it. The human must approve rights and tracking before asset production. Do not invent a replacement dog. If the reference contradicts a detail below, review with the human and update this spec before drawing. Sticker generation is independent of core bot release.
+Ақтөс is Ortaq's friendly orange-and-white corgi, a roommate companion rather than a debt collector. [The official Ақтөс reference image](img/aktos-reference.jpg) is the visual source of truth. The owner generated this eight-pose sheet with Gemini and approved its use in the public Ortaq repository. Preserve the original file unchanged; derive future assets from it rather than replacing it. Do not invent a different dog. If a future asset contradicts the reference, review it with the owner before use. Sticker generation is independent of core bot release.
 
 ## Fixed identity and visual consistency
 
@@ -31,7 +31,7 @@ Urgent attention uses a concise text/mention by default; if a sticker is explici
 
 ## Asset preparation checklist
 
-1. Obtain the original reference and permission to adapt it for a public repo/sticker pack. Record source and license privately or in a nonsecret manifest. Create a master model sheet and obtain human visual approval.
+1. Use the approved [original reference](img/aktos-reference.jpg) without altering it. Record its Gemini origin and the owner's public-repository approval in a nonsecret manifest. Create a separate master model sheet and obtain human visual approval before producing sticker assets.
 2. Produce the 12 poses from the same master; use transparent source layers and a consistent canvas, palette, outline and chest/facial markings. Export a contact sheet for side-by-side review. Keep editable source files and a manifest mapping pose key to file and version.
 3. **At implementation time**, verify the current official Telegram sticker documentation for static/animated/video formats, dimensions, file-size limits, color/transparency rules, emoji assignment, pack naming and upload method. These limits can change; do not hard-code unverified numbers from this planning document. Record the documentation URL and verification date in the manifest. Validate every export automatically against those rules and inspect it on light/dark chat backgrounds at actual displayed size.
 4. Human creates/uploads the pack using Telegram's official sticker tooling/BotFather or an approved bot API method, chooses a pack name and emoji for each sticker, and records returned sticker `file_id`s in deployment configuration. Do not commit real bot token or private API response. Verify the pack in the **development** bot before production configuration.
@@ -39,4 +39,4 @@ Urgent attention uses a concise text/mention by default; if a sticker is explici
 
 ## Acceptance and release boundary
 
-Human approves all 12 stickers against the supplied image; automated file checks pass the then-current Telegram requirements; test pack works in the dev group; no core action depends on sticker availability. Until provenance and rights for the local reference are confirmed, V2-07-01 is blocked and mascot assets are not guessed or marked complete. The release guide allows a documented core-only launch with mascot integration deferred, with a specific owner and follow-up date.
+Human approves all 12 future stickers against the official reference; automated file checks pass the then-current Telegram requirements; a test pack works in the dev group; no core action depends on sticker availability. Reference approval is complete, but sticker production, review, upload and integration remain future V2-07 work. The release guide allows a documented core-only launch with mascot integration deferred, with a specific owner and follow-up date.

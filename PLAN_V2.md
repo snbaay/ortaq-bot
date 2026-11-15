@@ -12,13 +12,13 @@
 
 ## Progress
 
-Planning baseline: 2026-11-15, branch `dev`, clean tree before documentation edits. Historical A–G checkboxes retained. Implementation: **0/42 tasks**. Manual Telegram verification: **not performed**. Last completed task: none. Next: **V2-00-01**. After each task update counts, commit SHA, manual status, and next ID here.
+Planning baseline: 2026-11-15, branch `dev`, clean tree before documentation edits. Historical A–G checkboxes retained. Implementation: **0/42 tasks**. V2-00-01 audit is partial: 27 commands, schema, preflight SQL and restore procedure documented in `docs/ORTAQ_V2_RELEASE.md`; focused `FullFlowTest` and full Maven suite passed (124 tests, 31 suites). Manual Telegram verification: **pending**. Sanitized staging restore and before/after row-count/balance comparison: **pending**. Last completed task: none. Next: **V2-00-01**. After each task update counts, commit SHA, manual status, and next ID here.
 
 ## Blockers
 
 | Task | Evidence | Owner / next action |
 | --- | --- | --- |
-| V2-00-01 | Need a sanitized Neon schema/row-count snapshot and tested backup/restore before production migration; never request credentials in the repo. | Human supplies backup confirmation and safe staging copy during implementation. |
+| V2-00-01 | 2026-11-15: `./mvnw.cmd -q -Dtest=FullFlowTest test` and `./mvnw.cmd -q test` passed with fake bot values, but no sanitized Neon staging copy or verified restore result is available here. Read-only SQL and restore steps are documented; no actual Neon counts/balances or Telegram command checks were run. The task's tested-restore acceptance criterion is unmet. | Human provides a sanitized disposable staging copy or a verified backup/restore report with aggregate count/balance results, without credentials in Git; then rerun preflight on that copy and record manual dev-group command inspection. Do not start V2-00-02 yet. |
 | V2-07-01 | The official `docs/img/aktos-reference.jpg` is approved for this public repository; the separate model sheet and asset manifest are still pending. | Use the original unchanged when preparing V2-07 assets. Core features remain unblocked. |
 | V2-08-03 | A separate development bot/group is required for actual Telegram checks. | Human runs it with private credentials; record results only after testing. |
 

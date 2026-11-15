@@ -4,7 +4,25 @@ This is a checklist for a later implementation release. **No production migratio
 
 ## V2-00-01 baseline audit (implementation preflight)
 
-On 15 November 2026, `dev` was clean before this audit. `./mvnw.cmd -q test` completed with **124 tests in 31 suites, 0 failures, 0 errors, 0 skipped** using fake bot credentials and the test profile's in-memory H2. The initial sandbox run could not download Maven; the approved network retry passed. This is an automated baseline only; no dev Telegram command or Neon backup/restore was verified. No schema or ledger write was made for this audit.
+On 15 November 2026, `dev` was clean before this audit. `./mvnw.cmd -q test` completed with **124 tests in 31 suites, 0 failures, 0 errors, 0 skipped** using fake bot credentials and the test profile's in-memory H2. The initial sandbox run could not download Maven; the approved network retry passed. This is an automated baseline only; no dev Telegram command or Neon backup/restore was verified **by the agent**. No schema or ledger write was made by the agent for this audit.
+
+### Owner-reported Neon backup and restore verification
+
+The owner reported the following manual verification on 15 November 2026. The agent did not connect to either database, run the backup/restore commands, inspect the archive, or independently check the SQL outputs.
+
+| Check | Owner-reported result |
+| --- | --- |
+| Source | Neon project `ortaq-bot`, branch `ortaq-backup-check-20261115`, database `neondb` |
+| Isolated target | Separate Neon project `ortaq-restore-check`, database `ortaq_restore_check` |
+| Archive | `ortaq-backup-20261115.dump`, 30,789 bytes; archive contents and credentials remain outside Git |
+| Tools and operation | PostgreSQL `pg_dump`/`pg_restore` 18.7; restore completed successfully |
+| Schema/rows | All ten original tables restored; row counts matched (individual counts not supplied) |
+| Active ledger totals | Expenses: 2067.00 in both databases; shares: 2067.00 in both databases |
+| Member balances | All three matched exactly: -660.66, +1332.38, -671.72; sum is zero |
+| Integrity | Expense/share mismatches: 0; cross-household payer issues: 0; cross-household share issues: 0 |
+| Production | Owner reports no production modification |
+
+This verifies the backup/restore and reported financial comparison for V2-00-01. **Separate development-bot Telegram checks and staging-data sanitization remain pending.** Keep the restored staging project private until direct identifiers and free text are sanitized; its financial records remain sensitive even afterward. Do not treat either pending step as completed or run V2 migrations yet.
 
 The 27 current commands route as follows. `/start` and `/komek` work in private chat; the other handlers require a group. These are descriptions of current code, not V2 acceptance claims.
 

@@ -47,10 +47,16 @@ public class DeadlineHandler implements CommandHandler {
                 }
             }
             case "merzim_oshiru" -> {
+                var requester = members.findByHouseholdAndTelegramUserId(household, ctx.sender().id()).orElse(null);
+                if (requester == null) return;
                 try {
                     long id = Long.parseLong(ctx.args().trim());
-                    ctx.reply(messages.getMessage(deadlines.delete(household, id)
-                            ? "deadline.deleted" : "deadline.notFound"));
+                    String key = switch (deadlines.delete(household, requester, id)) {
+                        case DELETED -> "deadline.deleted";
+                        case NOT_FOUND -> "deadline.notFound";
+                        case NOT_OWNER -> "deadline.notOwner";
+                    };
+                    ctx.reply(messages.getMessage(key));
                 } catch (NumberFormatException e) { ctx.reply(messages.getMessage("deadline.usageDelete")); }
             }
             case "merzim" -> {

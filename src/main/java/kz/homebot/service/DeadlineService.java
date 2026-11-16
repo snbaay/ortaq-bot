@@ -14,6 +14,7 @@ import kz.homebot.config.Limits;
 
 @Service
 public class DeadlineService {
+    public enum DeleteResult { DELETED, NOT_FOUND, NOT_OWNER }
     private final PaymentDeadlineRepository deadlines;
     private final PaymentCountdown countdown;
     public DeadlineService(PaymentDeadlineRepository deadlines, PaymentCountdown countdown) {
@@ -22,7 +23,9 @@ public class DeadlineService {
     @Transactional
     public PaymentDeadline add(Household household, Member creator, int day, BigDecimal amount, String title) {
         String cleaned = title == null ? "" : title.trim();
-        if (day < 1 || day > 31 || cleaned.isEmpty() || cleaned.length() > Limits.DEADLINE_TITLE
+        if (household == null || creator == null || creator.getHousehold() == null
+                || !household.getId().equals(creator.getHousehold().getId())
+                || day < 1 || day > 31 || cleaned.isEmpty() || cleaned.length() > Limits.DEADLINE_TITLE
                 || deadlines.countByHouseholdAndActiveTrue(household) >= Limits.DEADLINES
                 || (amount != null && (amount.compareTo(BigDecimal.ZERO) <= 0
                 || amount.compareTo(Limits.MAX_AMOUNT) > 0 || amount.scale() > 2))) {
@@ -37,11 +40,14 @@ public class DeadlineService {
                 .sorted(Comparator.comparingLong(d -> countdown.daysLeft(today, d.getDayOfMonth()))).toList();
     }
     @Transactional
-    public boolean delete(Household household, Long id) {
+    public DeleteResult delete(Household household, Member requester, Long id) {
+        if (household == null || requester == null || requester.getHousehold() == null
+                || !household.getId().equals(requester.getHousehold().getId())) return DeleteResult.NOT_FOUND;
         var deadline = deadlines.findByIdAndHouseholdAndActiveTrue(id, household).orElse(null);
-        if (deadline == null) return false;
+        if (deadline == null) return DeleteResult.NOT_FOUND;
+        if (!deadline.getCreatedBy().getId().equals(requester.getId())) return DeleteResult.NOT_OWNER;
         deadline.setActive(false);
         deadlines.save(deadline);
-        return true;
+        return DeleteResult.DELETED;
     }
 }

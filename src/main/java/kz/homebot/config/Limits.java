@@ -13,5 +13,7 @@ public final class Limits {
     public static final int DEADLINE_TITLE = 40;
     public static final int DEADLINES = 20;
     public static final int RANDOM_OPTIONS = 10;
+    public static final int RANDOM_OPTION = 100;
+    public static final int RANDOM_QUESTION = 200;
     public static final int TELEGRAM_MESSAGE = 4096;
 }

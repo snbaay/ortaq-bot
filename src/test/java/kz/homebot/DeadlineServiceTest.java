@@ -30,8 +30,8 @@ class DeadlineServiceTest {
         var sooner = deadlines.add(home, member, 5, null, "Internet");
         assertThat(deadlines.upcoming(home, LocalDate.of(2026, 10, 4)))
                 .extracting(d -> d.getId()).containsExactly(sooner.getId(), later.getId());
-        assertThat(deadlines.delete(other, sooner.getId())).isFalse();
-        assertThat(deadlines.delete(home, sooner.getId())).isTrue();
+        assertThat(deadlines.delete(other, member, sooner.getId())).isEqualTo(DeadlineService.DeleteResult.NOT_FOUND);
+        assertThat(deadlines.delete(home, member, sooner.getId())).isEqualTo(DeadlineService.DeleteResult.DELETED);
         assertThat(deadlines.upcoming(home, LocalDate.of(2026, 10, 4))).hasSize(1);
     }
 
@@ -42,8 +42,25 @@ class DeadlineServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> deadlines.add(home, member, 1, null, "x".repeat(41)))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> deadlines.add(home, member, 5, new BigDecimal("-1.00"), "Rent"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> deadlines.add(home, member, 5, new BigDecimal("1.001"), "Rent"))
+                .isInstanceOf(IllegalArgumentException.class);
         for (int i = 0; i < 20; i++) deadlines.add(home, member, i + 1, null, "Bill " + i);
         assertThatThrownBy(() -> deadlines.add(home, member, 21, null, "Extra"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void onlyCreatorCanDeleteOwnDeadline() {
+        Household home = households.save(new Household(-74L, "Home"));
+        Member creator = members.save(new Member(home, 1L, "Creator"));
+        Member other = members.save(new Member(home, 2L, "Other"));
+        var deadline = deadlines.add(home, creator, 31, new BigDecimal("100.00"), "Rent");
+
+        assertThat(deadlines.delete(home, other, deadline.getId()))
+                .isEqualTo(DeadlineService.DeleteResult.NOT_OWNER);
+        assertThat(deadlines.upcoming(home, LocalDate.of(2026, 2, 1))).hasSize(1);
+        assertThat(deadlines.delete(home, creator, deadline.getId()))
+                .isEqualTo(DeadlineService.DeleteResult.DELETED);
     }
 }

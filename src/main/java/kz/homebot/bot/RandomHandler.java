@@ -27,12 +27,16 @@ public class RandomHandler implements CommandHandler {
             case "tandau" -> {
                 List<String> options = Arrays.stream(ctx.args().split("[,|]"))
                         .map(String::trim).filter(s -> !s.isEmpty()).toList();
-                if (options.size() < 2 || options.size() > Limits.RANDOM_OPTIONS) {
+                if (options.size() < 2 || options.size() > Limits.RANDOM_OPTIONS
+                        || options.stream().anyMatch(option -> option.length() > Limits.RANDOM_OPTION)) {
                     ctx.reply(messages.getMessage("random.usageChoose")); return;
                 }
                 ctx.reply(messages.getMessage("random.choice", picker.pick(options)));
             }
             case "kim" -> {
+                if (ctx.args().trim().length() > Limits.RANDOM_QUESTION) {
+                    ctx.reply(messages.getMessage("random.questionTooLong")); return;
+                }
                 var household = households.findByTelegramChatId(ctx.chatId()).orElse(null);
                 if (household == null) return;
                 var all = members.findByHousehold(household);

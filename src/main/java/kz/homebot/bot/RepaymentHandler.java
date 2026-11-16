@@ -91,12 +91,12 @@ public class RepaymentHandler implements CommandHandler {
             }
             String nameQuery = nameBuilder.toString().toLowerCase(Locale.ROOT);
 
-            if (senderMember.getDisplayName().toLowerCase(Locale.ROOT).startsWith(nameQuery)) {
+            if (senderMember.getDisplayName().equalsIgnoreCase(nameQuery)) {
                 ctx.reply(messageService.getMessage("tolem.self"));
                 return;
             }
 
-            List<Member> matches = otherMembers.stream()
+            List<Member> matches = allMembers.stream()
                     .filter(m -> m.getDisplayName().toLowerCase(Locale.ROOT).startsWith(nameQuery))
                     .toList();
 

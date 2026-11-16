@@ -42,12 +42,14 @@ public class ExpenseService {
      */
     @Transactional
     public ExpenseResult addExpense(Household household, Member payer, BigDecimal amount, String description) {
+        validateExpense(household, payer, amount, description);
         return saveExpense(household, payer, amount, description, memberRepository.findByHousehold(household));
     }
 
     @Transactional
     public ExpenseResult addExpense(Household household, Member payer, BigDecimal amount, String description,
                                     List<Member> selectedMembers) {
+        validateExpense(household, payer, amount, description);
         if (selectedMembers == null) {
             throw new IllegalArgumentException("Selected members required");
         }
@@ -65,6 +67,10 @@ public class ExpenseService {
 
     private ExpenseResult saveExpense(Household household, Member payer, BigDecimal amount,
                                       String description, List<Member> members) {
+        if (members.isEmpty() || members.stream().anyMatch(m -> m == null || m.getHousehold() == null
+                || !household.getId().equals(m.getHousehold().getId()))) {
+            throw new IllegalArgumentException("Expense members must belong to household");
+        }
         Expense expense = new Expense(household, payer, amount, description);
         expense = expenseRepository.save(expense);
         List<BigDecimal> shares = expenseSplitter.split(amount, members.size());
@@ -75,6 +81,17 @@ public class ExpenseService {
         }
 
         return new ExpenseResult(expense, members, shares);
+    }
+
+    private void validateExpense(Household household, Member payer, BigDecimal amount, String description) {
+        if (household == null || household.getId() == null || payer == null || payer.getHousehold() == null
+                || !household.getId().equals(payer.getHousehold().getId())
+                || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0
+                || amount.compareTo(Limits.MAX_AMOUNT) > 0 || amount.scale() > 2
+                || description == null || description.isBlank()
+                || description.length() > Limits.EXPENSE_DESCRIPTION) {
+            throw new IllegalArgumentException("Invalid expense");
+        }
     }
 
     /**

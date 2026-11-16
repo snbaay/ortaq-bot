@@ -22,16 +22,21 @@ public class NoteHandler implements CommandHandler {
         if (!ctx.isGroup()) { ctx.reply(messages.getMessage("error.groupOnly")); return; }
         var household = households.findByTelegramChatId(ctx.chatId()).orElse(null);
         if (household == null) return;
+        var author = members.findByHouseholdAndTelegramUserId(household, ctx.sender().id()).orElse(null);
+        if (author == null) return;
         if ("jazba_oshiru".equals(ctx.command())) {
             try {
                 long id = Long.parseLong(ctx.args().trim());
-                ctx.reply(messages.getMessage(notes.delete(household, id) ? "note.deleted" : "note.notFound"));
+                String key = switch (notes.delete(household, author, id)) {
+                    case DELETED -> "note.deleted";
+                    case NOT_FOUND -> "note.notFound";
+                    case NOT_OWNER -> "note.notOwner";
+                };
+                ctx.reply(messages.getMessage(key));
             } catch (NumberFormatException e) { ctx.reply(messages.getMessage("note.usageDelete")); }
             return;
         }
         if (!ctx.args().isBlank()) {
-            var author = members.findByHouseholdAndTelegramUserId(household, ctx.sender().id()).orElse(null);
-            if (author == null) return;
             try { ctx.reply(messages.getMessage("note.added", notes.add(household, author, ctx.args()).getId())); }
             catch (IllegalArgumentException e) { ctx.reply(messages.getMessage("note.invalid")); }
             return;

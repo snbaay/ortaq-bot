@@ -20,7 +20,9 @@ public class ChoreService {
     @Transactional
     public ChoreLog add(Household household, Member member, String text) {
         String cleaned = text == null ? "" : text.trim();
-        if (cleaned.isEmpty() || cleaned.length() > Limits.CHORE) throw new IllegalArgumentException("Invalid chore");
+        if (household == null || member == null || member.getHousehold() == null
+                || !household.getId().equals(member.getHousehold().getId())
+                || cleaned.isEmpty() || cleaned.length() > Limits.CHORE) throw new IllegalArgumentException("Invalid chore");
         return logs.save(new ChoreLog(household, member, cleaned, LocalDateTime.now(ZoneId.of("Asia/Almaty"))));
     }
     @Transactional(readOnly = true)

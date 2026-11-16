@@ -26,8 +26,8 @@ class NoteServiceTest {
         var note = notes.add(home, author, "  WiFi password is on router  ");
         assertThat(note.getText()).isEqualTo("WiFi password is on router");
         assertThat(notes.latest(home)).hasSize(1);
-        assertThat(notes.delete(other, note.getId())).isFalse();
-        assertThat(notes.delete(home, note.getId())).isTrue();
+        assertThat(notes.delete(other, author, note.getId())).isEqualTo(NoteService.DeleteResult.NOT_FOUND);
+        assertThat(notes.delete(home, author, note.getId())).isEqualTo(NoteService.DeleteResult.DELETED);
         assertThat(notes.latest(home)).isEmpty();
     }
 

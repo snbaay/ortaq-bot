@@ -19,6 +19,9 @@ public class ShoppingService {
 
     @Transactional
     public List<ShoppingItem> add(Household household, Member member, String input) {
+        if (!sameHousehold(household, member) || input == null) {
+            throw new IllegalArgumentException("Invalid shopping member or input");
+        }
         List<String> names = Arrays.stream(input.split(",", -1)).map(String::trim).toList();
         if (names.isEmpty() || names.stream().anyMatch(s -> s.isEmpty() || s.length() > Limits.SHOPPING_ITEM)
                 || items.countByHouseholdAndBoughtFalse(household) + names.size() > Limits.SHOPPING_OPEN) {
@@ -35,10 +38,16 @@ public class ShoppingService {
 
     @Transactional
     public boolean buy(Household household, Member buyer, Long id) {
+        if (!sameHousehold(household, buyer) || id == null) return false;
         var item = items.findByIdAndHousehold(id, household).orElse(null);
         if (item == null || item.isBought()) return false;
         item.markBought(buyer, LocalDateTime.now(ZoneId.of("Asia/Almaty")));
         items.save(item);
         return true;
+    }
+
+    private boolean sameHousehold(Household household, Member member) {
+        return household != null && member != null && member.getHousehold() != null
+                && household.getId() != null && household.getId().equals(member.getHousehold().getId());
     }
 }

@@ -1,11 +1,11 @@
 # Ortaq 2.0 test matrix
 
-This matrix is the evidence map for `PLAN_V2.md`. All tests use fake bot credentials and an isolated H2 database unless a disposable PostgreSQL staging copy is explicitly named. Mockito/fake Telegram client captures sends; no unit/integration test contacts Telegram. For bugs, commit a failing regression test first, then the fix. `Telegram` means a **human** runs a separate development bot/group and records date, result and relevant message IDs without tokens or private content. Planning has performed none of these V2 checks.
+This matrix is the evidence map for `PLAN_V2.md`. Automated tests use fake bot credentials and isolated H2 unless a disposable PostgreSQL staging copy is explicitly named. The V2-00-02 PostgreSQL test is opt-in and must not run without owner approval. Mockito/fake Telegram client captures sends; no ordinary unit/integration test contacts Telegram. For bugs, commit a failing regression test first, then the fix. `Telegram` means a **human** runs a separate development bot/group and records date, result and relevant message IDs without tokens or private content. Actual results are recorded in the plan and release guide.
 
 | Task | Automated test first / decisive assertions | Telegram manual check |
 | --- | --- | --- |
 | V2-00-01 | Baseline full Maven suite; record failures, legacy command/schema count and old ledger sum | Read commands and backup procedure |
-| V2-00-02 | Migrate populated pre-V2 fixture and empty DB; row counts/balances equal, migration idempotent | Boot staging copy and compare counts |
+| V2-00-02 | Empty H2 plus Hibernate `validate`; populated Hibernate-created legacy H2 fixture retains IDs, expense/share totals, balances and cooking rows across repeated migration; partial schema refused; failed migration rolls back its ledger write | Only after owner approval, run the guarded PostgreSQL staging rehearsal in `ORTAQ_V2_RELEASE.md`; compare counts, balances, migration history and Hibernate validation. H2 success alone does not close this task. |
 | V2-00-03 | Reject nonmember, cross-household ID, private write; retain existing registrations | Try two groups and private chat |
 | V2-01-01 | Numeric group text produces zero expense; `/shygyn` produces one | Compare `/tarih` before/after both |
 | V2-01-02 | Valid/invalid expense, settlement, undo, history lazy payer, report and balance invariants | Exercise seven finance commands |

@@ -123,7 +123,7 @@ The 27 current commands route as follows. `/start` and `/komek` work in private 
 
 `HomeTelegramBot` also calls `ExpenseHandler.handlePlainExpense` for any digit-leading group text, outside the command map. It registers/refreshes a member for every text message in a group and ignores callback and non-text updates. `CommandRouter` catches handler exceptions and sends a generic error. Current lazy relation access in history, notes and chores happens after service return and needs regression tests in V2-01. `DigestJob` polls every 15 minutes and persists `household.last_digest_date` after sending; it does not use a separate delivery table yet. The current `README.md` and `DEPLOY.md` still advertise plain-number expenses; V2-01-01/V2-08-04 will correct that when code behavior changes.
 
-The legacy schema has exactly ten JPA tables: `household` (unique `telegram_chat_id`, `last_digest_date`), `member` (unique `(household_id,telegram_user_id)`), `expense` (`amount NUMERIC(12,2)`, `deleted`, `settlement`, payer/household FKs), `expense_share` (`share_amount NUMERIC(12,2)`, expense/member FKs), `cooking_schedule` (unique household/day/member), `cooking_swap` (unique household/date/from-member), `shopping_item`, `note`, `chore_log`, and `payment_deadline`. The last four have household relationships and soft/bought/active flags as appropriate. Dev uses file H2 `./data/homebot`; tests use in-memory H2; production uses PostgreSQL with `ddl-auto=update`. There is no migration history yet. No V2 table should replace these old rows or IDs. The ledger rule is `balance = active amount paid - active share amount owed`; an active settlement participates in balances but is excluded from monthly expense reports. Every active expense should have shares totaling its amount; household balances should sum to zero.
+The legacy schema has exactly ten JPA tables: `household` (unique `telegram_chat_id`, `last_digest_date`), `member` (unique `(household_id,telegram_user_id)`), `expense` (`amount NUMERIC(12,2)`, `deleted`, `settlement`, payer/household FKs), `expense_share` (`share_amount NUMERIC(12,2)`, expense/member FKs), `cooking_schedule` (unique household/day/member), `cooking_swap` (unique household/date/from-member), `shopping_item`, `note`, `chore_log`, and `payment_deadline`. The last four have household relationships and soft/bought/active flags as appropriate. Before V2-00-02, dev used file H2 `./data/homebot`, tests used in-memory H2, and the production PostgreSQL profile had `ddl-auto=update` with no migration history. The proposed V2-00-02 code changes dev to Flyway plus `validate` and keeps Flyway disabled in production while PostgreSQL verification is pending. No V2 table should replace old rows or IDs. The ledger rule is `balance = active amount paid - active share amount owed`; an active settlement participates in balances but is excluded from monthly expense reports. Every active expense should have shares totaling its amount; household balances should sum to zero.
 
 ### Read-only PostgreSQL preflight queries
 
@@ -203,6 +203,44 @@ COMMIT;
 ```
 
 The mismatch query should return no rows and each household's `net_balance` should be zero. If not, preserve the evidence and investigate before migration; do not adjust records to make the check pass. To detect cross-household references, also inspect joins from `expense.payer_id` and `expense_share.member_id` to `member.household_id`; these FKs guarantee existence but not household equality. Existing rows must remain unchanged even if an anomaly is discovered.
+
+### V2-00-02 migration rehearsal gate (awaiting owner approval)
+
+V2-00-02 adds Flyway version 1. On a clean database it creates the ten legacy tables; on a complete existing legacy schema the application checks all ten tables, required columns, primary keys and money scales before recording a version 1 baseline. A partial or unfamiliar schema is refused. Dev uses Flyway followed by Hibernate `validate`. **The production profile has Flyway disabled and Hibernate schema changes disabled** until PostgreSQL staging verification is reported and a separate production cutover is approved. The local H2 tests do not prove Neon/PostgreSQL compatibility. No V2 migration has been run against the sanitized Neon project by the agent.
+
+The following is a **prepared human procedure, not authorization to run it now**. When the owner explicitly approves the staging rehearsal, use only the separate `ortaq-restore-check` Neon project, database `ortaq_restore_check`. The opt-in `StagingMigrationRehearsalTest` does not start the bot. It verifies PostgreSQL, the exact database name and sanitized member IDs before calling Flyway; it snapshots all ten tables' primary keys, financial rows/totals and balances, runs the baseline twice, and invokes Hibernate schema validation. A name guard cannot identify a Neon project, so the owner must independently confirm the host belongs to the separate staging project. The only intended persistent write is Flyway's history table; no legacy row should change.
+
+1. Confirm `git branch --show-current` is `dev`, no bot process is running with a production token, and the staging host shown in the Neon console belongs to **`ortaq-restore-check`**, not `ortaq-bot`. Do not paste a full connection string, password or test log into chat. Run the read-only preflight SQL above against staging and retain the aggregate results privately.
+2. In a fresh Windows PowerShell window at the repository root, enter the staging host and user. `psql -W` asks for the password privately. Confirm the first query prints `ortaq_restore_check`; stop if it does not.
+
+   ```powershell
+   if ((git branch --show-current).Trim() -ne 'dev') { throw 'Stop: checkout dev first.' }
+   $stageHost = Read-Host 'Host of the separate ortaq-restore-check project'
+   $stageUser = Read-Host 'Staging database user'
+   $env:PGSSLMODE = 'require'
+   psql -X -v ON_ERROR_STOP=1 -W -h $stageHost -U $stageUser -d ortaq_restore_check -c 'SELECT current_database(), current_user, inet_server_addr();'
+   if ($LASTEXITCODE -ne 0) { throw 'Staging identity check failed; stop.' }
+   ```
+
+3. **Only after explicit approval**, supply the staging password to this temporary process environment and run the opt-in test. The prompt hides the password; the cleanup removes it from that PowerShell process. The test refuses a URL without TLS (`sslmode=require`). It will be skipped during ordinary `mvnw test` runs.
+
+   ```powershell
+   $env:ORTAQ_STAGING_JDBC_URL = "jdbc:postgresql://${stageHost}:5432/ortaq_restore_check?sslmode=require"
+   $env:ORTAQ_STAGING_DB_USER = $stageUser
+   $secret = Read-Host 'Staging database password' -AsSecureString
+   $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+   try { $env:ORTAQ_STAGING_DB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
+   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr); $secret.Dispose() }
+   $env:ORTAQ_STAGING_MIGRATION_APPROVED = 'YES'
+   try {
+       .\mvnw.cmd -q '-Dtest=StagingMigrationRehearsalTest' test
+       if ($LASTEXITCODE -ne 0) { throw 'Staging rehearsal failed; stop and investigate.' }
+   } finally {
+       Remove-Item Env:ORTAQ_STAGING_JDBC_URL,Env:ORTAQ_STAGING_DB_USER,Env:ORTAQ_STAGING_DB_PASSWORD,Env:ORTAQ_STAGING_MIGRATION_APPROVED -ErrorAction SilentlyContinue
+   }
+   ```
+
+4. Inspect the staging test result and rerun the read-only preflight SQL above on staging. Confirm the ten original counts, 3 members, 13 expenses, 37 shares, 2067.00 active expenses/shares, the three individual balances, zero mismatches and zero cross-household references. Check the version 1 history row with `psql -X -v ON_ERROR_STOP=1 -W -h $stageHost -U $stageUser -d ortaq_restore_check -c 'SELECT version, success FROM flyway_schema_history WHERE version = ''1'';'`; the baseline may have an additional schema marker. If any check fails, stop. Do not run `flyway clean`, `repair`, `DROP`, or any migration against production. For a disposable staging failure, restore a fresh separate copy from the verified archive and sanitize it again after investigating; never overwrite production. Report pass/fail, database identity, count and balance aggregates, Flyway version, and Hibernate validation result without secrets or personal data. Only then consider V2-00-02 completion and the later production validation switch.
 
 ### Backup and restore rehearsal procedure
 

@@ -78,6 +78,15 @@ public class MemberRegistrationService {
                 telegramUser.getLastName(), telegramUser.getUserName());
     }
 
+    @Transactional(readOnly = true)
+    public Optional<Member> findRegisteredMember(Long telegramChatId, Long telegramUserId) {
+        if (telegramChatId == null || telegramUserId == null) {
+            return Optional.empty();
+        }
+        return householdRepository.findByTelegramChatId(telegramChatId)
+                .flatMap(household -> memberRepository.findByHouseholdAndTelegramUserId(household, telegramUserId));
+    }
+
     private String buildDisplayName(String firstName, String lastName) {
         boolean hasFirst = firstName != null && !firstName.isBlank();
         boolean hasLast = lastName != null && !lastName.isBlank();

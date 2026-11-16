@@ -139,6 +139,11 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                 || "group".equalsIgnoreCase(chatType) || "supergroup".equalsIgnoreCase(chatType);
 
         User from = message.getFrom();
+        // Telegram can send group posts on behalf of a chat or another bot. Neither is a roommate.
+        if (isGroup && (from == null || from.getId() == null || from.getId() <= 0
+                || Boolean.TRUE.equals(from.getIsBot()) || message.getSenderChat() != null)) {
+            return;
+        }
         if (isGroup && from != null) {
             memberRegistrationService.registerMember(chatId, chat.getTitle(), from);
         }

@@ -10,5 +10,5 @@ public class AllowedChats {
         ids = config == null || config.isBlank() ? Set.of() : Arrays.stream(config.split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).map(Long::parseLong).collect(Collectors.toUnmodifiableSet());
     }
-    public boolean allows(Long chatId) { return ids.isEmpty() || ids.contains(chatId); }
+    public boolean allows(Long chatId) { return chatId != null && (ids.isEmpty() || ids.contains(chatId)); }
 }

@@ -117,4 +117,15 @@ class MemberRegistrationServiceTest {
         assertEquals("new_name", registrationService.registerMember(-100123456789L, "Dostar Flat", user)
                 .getTelegramUsername());
     }
+
+    @Test
+    void lookupUsesBothHouseholdChatAndTelegramUserId() {
+        Member first = registrationService.registerMember(-101L, "First", 111L, "Ali", null);
+        registrationService.registerMember(-102L, "Second", 222L, "Dana", null);
+
+        assertEquals(first.getId(), registrationService.findRegisteredMember(-101L, 111L).orElseThrow().getId());
+        assertEquals(true, registrationService.findRegisteredMember(-102L, 111L).isEmpty());
+        assertEquals(true, registrationService.findRegisteredMember(-101L, 222L).isEmpty());
+        assertEquals(true, registrationService.findRegisteredMember(-999L, 111L).isEmpty());
+    }
 }

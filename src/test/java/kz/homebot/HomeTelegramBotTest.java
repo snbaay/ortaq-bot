@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -178,5 +180,64 @@ class HomeTelegramBotTest {
         update.setMessage(message);
         restricted.consume(update);
         verify(memberRegistrationService, never()).registerMember(any(), any(), any(User.class));
+    }
+
+    @Test
+    void anonymousGroupCommandCannotReachHandler() {
+        ExpenseHandler expenseHandler = mock(ExpenseHandler.class);
+        HomeTelegramBot restricted = botWithExpenseHandler(expenseHandler);
+        Update update = groupUpdate("/shygyn 100 нан", null);
+
+        restricted.consume(update);
+
+        verify(expenseHandler, never()).handle(any());
+        verifyNoInteractions(memberRegistrationService);
+    }
+
+    @Test
+    void botOrAnonymousAdminCannotRegisterOrRunCommand() {
+        ExpenseHandler expenseHandler = mock(ExpenseHandler.class);
+        HomeTelegramBot restricted = botWithExpenseHandler(expenseHandler);
+        User otherBot = new User(44L, "Other Bot", true);
+        restricted.consume(groupUpdate("/shygyn 100 нан", otherBot));
+        Update anonymousAdmin = groupUpdate("/shygyn 100 нан", new User(55L, "Admin", false));
+        anonymousAdmin.getMessage().setSenderChat(Chat.builder().id(-10L).type("group").build());
+        restricted.consume(anonymousAdmin);
+
+        verify(expenseHandler, never()).handle(any());
+        verifyNoInteractions(memberRegistrationService);
+    }
+
+    @Test
+    void forwardedButtonUpdateDoesNotRegisterOrRunACommand() {
+        ExpenseHandler expenseHandler = mock(ExpenseHandler.class);
+        HomeTelegramBot restricted = botWithExpenseHandler(expenseHandler);
+        Update update = new Update();
+        CallbackQuery callback = new CallbackQuery();
+        callback.setFrom(new User(11L, "Visitor", false));
+        callback.setMessage(groupUpdate("/shygyn 100 нан", new User(11L, "Visitor", false)).getMessage());
+        callback.setData("v2:forwarded:confirm");
+        update.setCallbackQuery(callback);
+
+        restricted.consume(update);
+
+        verify(expenseHandler, never()).handle(any());
+        verifyNoInteractions(memberRegistrationService);
+    }
+
+    private HomeTelegramBot botWithExpenseHandler(ExpenseHandler expenseHandler) {
+        return new HomeTelegramBot("123456:fake_token", "test_bot", messageService,
+                memberRegistrationService, new CommandParser(),
+                new CommandRouter(List.of(expenseHandler), messageService), expenseHandler, telegramClient);
+    }
+
+    private Update groupUpdate(String text, User from) {
+        Update update = new Update();
+        Message message = new Message();
+        message.setChat(Chat.builder().id(-10L).type("group").title("Home").build());
+        message.setFrom(from);
+        message.setText(text);
+        update.setMessage(message);
+        return update;
     }
 }

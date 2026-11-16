@@ -1,6 +1,6 @@
 # Ortaq Bot (Homebot)
 
-For Ortaq 2.0, [PLAN_V2.md](PLAN_V2.md) is the implementation task list and [docs/ORTAQ_V2_SPEC.md](docs/ORTAQ_V2_SPEC.md) defines behavior. `PLAN.md` phases A–G remain historical and completed. If documentation conflicts, V2 documents control V2 scope; the stricter safety or security rule always wins. Work on `dev`, begin with the first unchecked V2 task, write regression tests before bug fixes, and preserve production records.
+For Ortaq 2.0, [PLAN_V2.md](PLAN_V2.md) is the implementation task list and [docs/ORTAQ_V2_SPEC.md](docs/ORTAQ_V2_SPEC.md) defines behavior. `PLAN.md` phases A–G remain historical and completed. If documentation conflicts, V2 documents control V2 scope; the stricter safety or security rule always wins. Work on `dev`, begin with the first unchecked eligible V2 task, write regression tests before bug fixes, and preserve production records. A user-authorized batch may complete multiple dependency-ready tasks in order, with focused verification and a separate commit per task; run the full suite after the batch. Record unverified manual Telegram checks as pending only where the plan allows, and continue independent tasks when one is blocked. Never touch production data or credentials or deploy without separate authorization.
 
 Telegram-бот для учета совместных расходов соседей/сожителей.
 

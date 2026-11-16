@@ -38,9 +38,9 @@ The owner created a distinct BotFather bot (`Ortaq Dev`), removed the production
 | `/balans` in private | Pass; group-only usage rejected |
 | `/kezek` | Pass; empty weekly schedule shown |
 | `/tizim` | Pass; empty shopping list shown |
-| Telegram `/` command picker | **Pending; not yet verified** |
+| Telegram `/` command picker | Pass; owner verified the legacy command list in private chat and the `ortaq test` group |
 
-V2-00-01 remains open because its manual dev-group command check includes the command picker, and the plan does not permit this task to close with that check pending. The owner should open `/` for the development bot in private chat and the test group, confirm the registered legacy commands appear, and report pass/fail. Do not infer picker success from `/komek`; it is a separate Telegram UI check. Do not begin V2-00-02 until V2-00-01 is complete.
+The owner reported the final command-picker pass on 16 November 2026. With the earlier backup/restore, staging sanitization, baseline test suite and dev-bot command checks, V2-00-01 acceptance and manual criteria are complete. This remains human-reported Telegram and Neon evidence; the agent did not run either system. V2-00-02 is the next task, pending a separate implementation request.
 
 ### Isolated staging sanitization procedure (human only)
 

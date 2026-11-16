@@ -22,7 +22,72 @@ The owner reported the following manual verification on 15 November 2026. The ag
 | Integrity | Expense/share mismatches: 0; cross-household payer issues: 0; cross-household share issues: 0 |
 | Production | Owner reports no production modification |
 
-This verifies the backup/restore and reported financial comparison for V2-00-01. **Separate development-bot Telegram checks and staging-data sanitization remain pending.** Keep the restored staging project private until direct identifiers and free text are sanitized; its financial records remain sensitive even afterward. Do not treat either pending step as completed or run V2 migrations yet.
+This records the owner-reported backup/restore and financial comparison for V2-00-01. The later staging and Telegram results are recorded below. The agent did not independently connect to Neon or Telegram.
+
+### Owner-reported staging and dev Telegram checks, 16 November 2026
+
+The owner reports running the SQL script below against the **isolated** Neon database `ortaq_restore_check`; it ended in `COMMIT`. Post-sanitization checks showed 3 members, 13 expenses and 37 expense shares. Active expense and share totals both remained 2067.00. The script's in-transaction row-count, individual-balance, expense/share and zero-sum checks passed. The owner reports that original production was not modified. These are human-reported results; the agent did not inspect either database. The script compares all ten table counts within the transaction, while the owner supplied individual post-commit counts for only three tables.
+
+The owner created a distinct BotFather bot (`Ortaq Dev`), removed the production bot from the separate test group, and started the existing application using the `dev` profile and an isolated H2 file. Reported results:
+
+| Check | Result |
+| --- | --- |
+| `/start` | Pass |
+| `/komek` | Pass; help text displays all 27 legacy commands |
+| `/balans` in group | Pass; registered tester shows 0 ₸ |
+| `/balans` in private | Pass; group-only usage rejected |
+| `/kezek` | Pass; empty weekly schedule shown |
+| `/tizim` | Pass; empty shopping list shown |
+| Telegram `/` command picker | **Pending; not yet verified** |
+
+V2-00-01 remains open because its manual dev-group command check includes the command picker, and the plan does not permit this task to close with that check pending. The owner should open `/` for the development bot in private chat and the test group, confirm the registered legacy commands appear, and report pass/fail. Do not infer picker success from `/komek`; it is a separate Telegram UI check. Do not begin V2-00-02 until V2-00-01 is complete.
+
+### Isolated staging sanitization procedure (human only)
+
+The reviewed [SQL script](sql/ORTAQ_V2_SANITIZE_STAGING.sql) matches the ten current JPA entities. It replaces `household.telegram_chat_id/title`, `member.telegram_user_id/display_name/telegram_username`, and the free text in `expense.description`, `shopping_item.text`, `note.text`, `chore_log.text`, and `payment_deadline.title`. It leaves all primary/foreign keys, dates, flags, amounts, shares and deadline settings intact. The script refuses any database name except `ortaq_restore_check`, validates counts and the complete ledger inside one transaction, and commits only after validation. Database name alone cannot prove Neon **project** identity: the human must confirm the separate `ortaq-restore-check` project's endpoint and use only its credentials. Do not run this script against the source project, backup branch, or original dump. Keep the staging project and its snapshots private: old row versions and backups may still contain original text, and financial patterns can remain identifying.
+
+From PowerShell in the `dev` checkout, using PostgreSQL client tools already installed:
+
+1. In the Neon console, select the **separate project** `ortaq-restore-check`, database `ortaq_restore_check`. Copy its host and database **user name** into local PowerShell variables; do not paste the connection string or password into chat or Git. Confirm its host differs from the `ortaq-bot` project's host. Keep the original dump outside the repository.
+2. Run the commands below. `psql -W` prompts for the staging password; no password is stored in the command or environment. Inspect the first result. Stop if the database or host is unexpected. Run the SQL only after this check.
+
+   ```powershell
+   $stageHost = Read-Host 'Host of the separate ortaq-restore-check Neon project'
+   $stageUser = Read-Host 'User of the separate staging database'
+   $env:PGSSLMODE = 'require'
+   $env:PGCONNECT_TIMEOUT = '10'
+   psql -X -v ON_ERROR_STOP=1 -W -h $stageHost -U $stageUser -d ortaq_restore_check -c 'SELECT current_database() AS database, current_user AS role, inet_server_addr() AS server_address;'
+   if ($LASTEXITCODE -ne 0) { throw 'Staging preflight failed; stop here.' }
+   psql -X -v ON_ERROR_STOP=1 -W -h $stageHost -U $stageUser -d ortaq_restore_check -f .\docs\sql\ORTAQ_V2_SANITIZE_STAGING.sql
+   if ($LASTEXITCODE -ne 0) { throw 'Sanitization failed; verify rollback before retrying.' }
+   ```
+
+3. Successful output must end with `COMMIT`. If an error occurs before `COMMIT`, the psql connection closes and PostgreSQL rolls back the transaction. In an interactive psql session, issue `ROLLBACK;` before disconnecting. [PostgreSQL documents `ON_ERROR_STOP` and psql exit behavior](https://www.postgresql.org/docs/current/app-psql.html). **Do not retry blindly**; determine the cause, restore a fresh disposable staging database from the original archive if needed, then repeat the host check. If a later check finds a problem after commit, recreate staging from the untouched original dump; pseudonyms cannot be reversed from this script.
+4. Open staging with `psql -X -v ON_ERROR_STOP=1 -W -h $stageHost -U $stageUser -d ortaq_restore_check`, paste the full **Read-only PostgreSQL preflight queries** block below, then `\q`. Compare with the recorded pre-sanitization result: ten table counts, 2067.00 active expenses and shares, all three balances (-660.66, +1332.38, -671.72), zero expense/share mismatches, zero cross-household payer/share issues, and household zero sum. Also run `SELECT count(*) AS unsanitized_members FROM public.member WHERE telegram_username IS NOT NULL OR display_name NOT LIKE 'Member %' OR telegram_user_id < 8000000000000000;` and confirm zero. The transaction script validates the other sanitized columns. Report counts and pass/fail only, never raw names, IDs, free text or credentials. The script's own validation compares pre/post values during the transaction; the separate post-commit check confirms the committed copy.
+
+### Separate development bot and H2 smoke check (human only)
+
+1. In Telegram, ask `@BotFather` for `/newbot`; choose a **new** username ending in `bot`. Keep its token private. Add only this new bot to a disposable test group; do not add the production bot. Ensure no other process polls the new token. The current code registers its command menu through `SetMyCommands` at startup.
+2. In a **new** PowerShell window from the `dev` checkout, confirm `git branch --show-current` prints `dev`. Use a fresh H2 path outside the repository; do not import the Neon dump into H2. Paste the following locally. The token prompt does not echo characters. Use the new bot's username without `@`.
+
+   ```powershell
+   if ((git branch --show-current).Trim() -ne 'dev') { throw 'Stop: checkout dev first.' }
+   $secureToken = Read-Host 'New development bot token' -AsSecureString
+   $tokenPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureToken)
+   try { $env:BOT_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPtr) }
+   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($tokenPtr); $secureToken.Dispose() }
+   $env:BOT_USERNAME = Read-Host 'New bot username without @'
+   $env:SPRING_PROFILES_ACTIVE = 'dev'
+   $devDir = Join-Path $env:LOCALAPPDATA 'OrtaqDevBot'
+   New-Item -ItemType Directory -Force -Path $devDir | Out-Null
+   $devDb = (Join-Path $devDir 'homebot').Replace('\','/')
+   $env:SPRING_DATASOURCE_URL = "jdbc:h2:file:$devDb;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1"
+   .\mvnw.cmd spring-boot:run
+   ```
+
+3. Wait for Spring startup and `Telegram command menu registered successfully`. If another local service uses port 8080, set `$env:PORT='8081'` **before** starting. If Telegram reports a 409 polling conflict, stop the other instance using the new token. Do not use the production token or production group.
+4. In private chat with the **new** bot, send `/start` and `/komek`; expect a greeting and command help. In the disposable group, send `/start@YourNewBotUsername`, `/komek@YourNewBotUsername`, `/balans@YourNewBotUsername`, `/kezek@YourNewBotUsername`, and `/tizim@YourNewBotUsername` (replace the placeholder with the actual username). Confirm each returns a response and no generic error. A fresh H2 database may have no expenses, cooking schedule, or shopping items; those should show their normal empty states. Have a second consenting test account send `/start` in the group if you want to inspect a two-member balance list. Tap `/` in the bot's private chat and in the group and confirm the command menu appears with the legacy commands, including these five. Record pass/fail and any error text without token or personal data.
+5. Stop with `Ctrl+C`. In that same window run `Remove-Item Env:BOT_TOKEN,Env:BOT_USERNAME,Env:SPRING_DATASOURCE_URL,Env:SPRING_PROFILES_ACTIVE -ErrorAction SilentlyContinue`. The H2 files stay in `%LOCALAPPDATA%\OrtaqDevBot`, separate from the repository's `data/homebot` and from Neon. Do not report the Telegram check as passed until actually performed.
 
 The 27 current commands route as follows. `/start` and `/komek` work in private chat; the other handlers require a group. These are descriptions of current code, not V2 acceptance claims.
 
@@ -112,6 +177,28 @@ WITH paid AS (
 )
 SELECT household_id, count(*) AS members, sum(balance) AS net_balance
 FROM balances GROUP BY household_id ORDER BY household_id;
+
+WITH paid AS (
+  SELECT household_id, payer_id AS member_id, sum(amount) AS total
+  FROM expense WHERE NOT deleted GROUP BY household_id, payer_id
+), owed AS (
+  SELECT e.household_id, s.member_id, sum(s.share_amount) AS total
+  FROM expense e JOIN expense_share s ON s.expense_id = e.id
+  WHERE NOT e.deleted GROUP BY e.household_id, s.member_id
+)
+SELECT m.id AS member_id, coalesce(p.total, 0) - coalesce(o.total, 0) AS balance
+FROM member m
+LEFT JOIN paid p ON p.household_id = m.household_id AND p.member_id = m.id
+LEFT JOIN owed o ON o.household_id = m.household_id AND o.member_id = m.id
+ORDER BY m.id;
+
+SELECT count(*) AS cross_household_payers
+FROM expense e JOIN member m ON m.id = e.payer_id
+WHERE e.household_id <> m.household_id;
+SELECT count(*) AS cross_household_shares
+FROM expense_share s JOIN expense e ON e.id = s.expense_id
+JOIN member m ON m.id = s.member_id
+WHERE e.household_id <> m.household_id;
 COMMIT;
 ```
 

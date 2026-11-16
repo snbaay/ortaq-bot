@@ -8,7 +8,7 @@ Ortaq is a Telegram bot for roommates sharing a household. One Telegram group is
 | --- | --- |
 | `/start` | Show a short introduction |
 | `/komek` | Show command help |
-| `/shygyn 630 су` | Add an expense; plain `630 су` also works in a group |
+| `/shygyn 630 су` | Add an expense explicitly |
 | `/shygyn 3000 пицца @user` | Split among mentioned members and the payer |
 | `/balans` | Show every member's net balance |
 | `/qaryz` | Show transfers needed to settle balances |
@@ -35,7 +35,7 @@ Ortaq is a Telegram bot for roommates sharing a household. One Telegram group is
 | `/tandau a, b, c` | Choose one of 2–10 options |
 | `/tiyn` | Flip a coin |
 
-`/start` and `/komek` work in private chats. Other commands require a group. Each roommate must send a message to register. Disable privacy mode in BotFather to enable plain expense messages.
+`/start` and `/komek` work in private chats. Other commands require a group. Each roommate must send a message to register. Ordinary group messages, including numbers, never create expenses.
 
 ## Architecture
 

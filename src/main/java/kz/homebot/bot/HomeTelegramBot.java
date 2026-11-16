@@ -152,17 +152,6 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                 ? new Sender(from.getId(), buildSenderName(from), from.getUserName())
                 : new Sender(0L, "Anonymous", null);
 
-        CommandContext ctx = new CommandContext(
-                chatId,
-                chatType,
-                sender,
-                "",
-                "",
-                message.getEntities(),
-                replyText -> send(chatId, replyText),
-                text
-        );
-
         Optional<CommandParser.ParsedCommand> parsed = commandParser.parse(text, botUsername);
         if (parsed.isPresent()) {
             CommandParser.ParsedCommand cmd = parsed.get();
@@ -177,13 +166,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                     text
             );
             commandRouter.route(routedCtx);
-        } else if (isGroup && startsWithDigit(text)) {
-            expenseHandler.handlePlainExpense(ctx, text);
         }
-    }
-
-    private boolean startsWithDigit(String text) {
-        return !text.isEmpty() && Character.isDigit(text.charAt(0));
     }
 
     private String buildSenderName(User from) {

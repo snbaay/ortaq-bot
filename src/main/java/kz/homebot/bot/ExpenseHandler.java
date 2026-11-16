@@ -57,14 +57,6 @@ public class ExpenseHandler implements CommandHandler {
         handleExpenseInput(ctx, rawText);
     }
 
-    public void handlePlainExpense(CommandContext ctx, String text) {
-        if (!ctx.isGroup()) {
-            ctx.reply(messageService.getMessage("error.groupOnly"));
-            return;
-        }
-        handleExpenseInput(ctx, text);
-    }
-
     private void handleExpenseInput(CommandContext ctx, String rawText) {
         if (rawText.isBlank()) {
             ctx.reply(messageService.getMessage("usage.shygyn"));

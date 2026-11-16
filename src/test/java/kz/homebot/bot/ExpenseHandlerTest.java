@@ -96,7 +96,7 @@ class ExpenseHandlerTest {
     }
 
     @Test
-    void handlePlainExpenseInGroup() {
+    void handlesSpacedAmountThroughExplicitCommand() {
         List<String> replies = new ArrayList<>();
         Household household = new Household(-100L, "Flat", LocalDateTime.now());
         Member member = new Member(household, 1L, "Askar", LocalDateTime.now());
@@ -111,9 +111,9 @@ class ExpenseHandlerTest {
                 .thenReturn("Шығын қосылды!");
 
         CommandContext ctx = new CommandContext(
-                -100L, "group", new Sender(1L, "Askar", null), "", "", List.of(), replies::add);
+                -100L, "group", new Sender(1L, "Askar", null), "shygyn", "2 500,50 хлеб", List.of(), replies::add);
 
-        handler.handlePlainExpense(ctx, "2 500,50 хлеб");
+        handler.handle(ctx);
 
         assertThat(replies).containsExactly("Шығын қосылды!");
     }

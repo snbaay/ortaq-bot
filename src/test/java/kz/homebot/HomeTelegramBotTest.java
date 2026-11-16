@@ -31,6 +31,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -223,6 +224,29 @@ class HomeTelegramBotTest {
 
         verify(expenseHandler, never()).handle(any());
         verifyNoInteractions(memberRegistrationService);
+    }
+
+    @Test
+    void ordinaryNumericGroupMessagesNeverReachExpenseHandler() {
+        ExpenseHandler expenseHandler = mock(ExpenseHandler.class);
+        HomeTelegramBot candidate = botWithExpenseHandler(expenseHandler);
+
+        candidate.consume(groupUpdate("630 су", new User(12L, "Ali", false)));
+        candidate.consume(groupUpdate("2 500,50 нан", new User(12L, "Ali", false)));
+
+        verify(expenseHandler).commands();
+        verifyNoMoreInteractions(expenseHandler);
+    }
+
+    @Test
+    void explicitExpenseCommandStillReachesHandler() {
+        ExpenseHandler expenseHandler = mock(ExpenseHandler.class);
+        when(expenseHandler.commands()).thenReturn(List.of("shygyn"));
+        HomeTelegramBot candidate = botWithExpenseHandler(expenseHandler);
+
+        candidate.consume(groupUpdate("/shygyn 630 су", new User(12L, "Ali", false)));
+
+        verify(expenseHandler).handle(any());
     }
 
     private HomeTelegramBot botWithExpenseHandler(ExpenseHandler expenseHandler) {

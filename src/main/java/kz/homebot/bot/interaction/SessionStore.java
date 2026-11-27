@@ -2,12 +2,13 @@ package kz.homebot.bot.interaction;
 
 import kz.homebot.bot.callback.CallbackRouter;
 import kz.homebot.domain.Member;
+import kz.homebot.repository.UtcTimestamp;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
@@ -24,9 +25,10 @@ public class SessionStore {
     private static final RowMapper<InteractionSession> ROW = (rs, row) -> new InteractionSession(
             rs.getString("id"), rs.getLong("household_id"), rs.getObject("telegram_user_id", Long.class),
             rs.getLong("chat_id"), rs.getString("kind"), rs.getString("state"), rs.getString("payload_json"),
-            rs.getObject("prompt_message_id", Integer.class), instant(rs.getTimestamp("prompt_expires_at")),
+            rs.getObject("prompt_message_id", Integer.class), UtcTimestamp.instant(rs.getObject("prompt_expires_at", LocalDateTime.class)),
             rs.getObject("menu_message_id", Integer.class), rs.getInt("version"),
-            instant(rs.getTimestamp("expires_at")), instant(rs.getTimestamp("closed_at")));
+            UtcTimestamp.instant(rs.getObject("expires_at", LocalDateTime.class)),
+            UtcTimestamp.instant(rs.getObject("closed_at", LocalDateTime.class)));
 
     private final JdbcTemplate jdbc;
     private final AtomicLong nextCleanup = new AtomicLong();
@@ -72,14 +74,18 @@ public class SessionStore {
     public <T> T withOwned(Member member, long chat, String kind, String state, String payload,
                           Function<InteractionSession, T> action) {
         var row = open(member, chat, kind, state, payload);
-        return action.apply(lock(row.id()).orElseThrow());
+        var current = lock(row.id()).orElseThrow();
+        if (!current.activeAt(Instant.now())) {
+            current = insert(current.householdId(), current.userId(), chat, kind, state, payload, Instant.now());
+        }
+        return action.apply(current);
     }
 
     public boolean bindMenu(InteractionSession session, int messageId) {
         return jdbc.update("""
                 UPDATE interaction_session SET menu_message_id = ? WHERE id = ? AND version = ?
                 AND menu_message_id IS NULL AND closed_at IS NULL AND expires_at > ?
-                """, messageId, session.id(), session.version(), Timestamp.from(Instant.now())) == 1;
+                """, messageId, session.id(), session.version(), UtcTimestamp.from(Instant.now())) == 1;
     }
 
     @Transactional
@@ -117,7 +123,7 @@ public class SessionStore {
         return jdbc.query("""
                 SELECT * FROM interaction_session WHERE household_id = ? AND telegram_user_id = ?
                 AND kind = ? AND closed_at IS NULL AND expires_at > ?
-                """, ROW, household, user, kind, Timestamp.from(now)).stream().findFirst();
+                """, ROW, household, user, kind, UtcTimestamp.from(now)).stream().findFirst();
     }
 
     protected InteractionSession insert(long household, Long user, long chat, String kind, String state,
@@ -128,7 +134,7 @@ public class SessionStore {
                 INSERT INTO interaction_session
                 (id, household_id, telegram_user_id, chat_id, kind, state, payload_json, version, created_at, expires_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
-                """, id, household, user, chat, kind, state, payload, Timestamp.from(now), Timestamp.from(expiry));
+                """, id, household, user, chat, kind, state, payload, UtcTimestamp.from(now), UtcTimestamp.from(expiry));
         return new InteractionSession(id, household, user, chat, kind, state, payload, null, null, null, 0, expiry, null);
     }
 
@@ -144,8 +150,8 @@ public class SessionStore {
         return jdbc.update("""
                 UPDATE interaction_session SET prompt_message_id = ?, prompt_expires_at = ?
                 WHERE id = ? AND version = ? AND prompt_message_id IS NULL AND closed_at IS NULL AND expires_at > ?
-                """, messageId, Timestamp.from(now.plus(PROMPT_LIFETIME)), session.id(), session.version(),
-                Timestamp.from(now)) == 1;
+                """, messageId, UtcTimestamp.from(now.plus(PROMPT_LIFETIME)), session.id(), session.version(),
+                UtcTimestamp.from(now)) == 1;
     }
 
     @Transactional
@@ -163,7 +169,7 @@ public class SessionStore {
                 UPDATE interaction_session SET state = ?, payload_json = ?, version = version + 1,
                 menu_message_id = NULL, prompt_message_id = NULL, prompt_expires_at = NULL, closed_at = ?
                 WHERE id = ? AND version = ? AND closed_at IS NULL
-                """, state, payload, closed == null ? null : Timestamp.from(closed), previous.id(), previous.version());
+                """, state, payload, closed == null ? null : UtcTimestamp.from(closed), previous.id(), previous.version());
         if (updated != 1) {
             throw new IllegalStateException("Session version changed");
         }
@@ -176,7 +182,7 @@ public class SessionStore {
                 UPDATE interaction_session SET state = 'confirmed', payload_json = ?, version = version + 1,
                 prompt_message_id = NULL, prompt_expires_at = NULL, closed_at = ?
                 WHERE id = ? AND version = ? AND closed_at IS NULL AND telegram_user_id IS NOT NULL
-                """, result, Timestamp.from(Instant.now()), previous.id(), previous.version());
+                """, result, UtcTimestamp.from(Instant.now()), previous.id(), previous.version());
         if (updated != 1) {
             throw new IllegalStateException("Session already finished");
         }
@@ -186,7 +192,7 @@ public class SessionStore {
         long scheduled = nextCleanup.get();
         if (now.getEpochSecond() >= scheduled
                 && nextCleanup.compareAndSet(scheduled, now.plus(Duration.ofDays(1)).getEpochSecond())) {
-            jdbc.update("DELETE FROM interaction_session WHERE expires_at < ?", Timestamp.from(now.minus(Duration.ofDays(7))));
+            jdbc.update("DELETE FROM interaction_session WHERE expires_at < ?", UtcTimestamp.from(now.minus(Duration.ofDays(7))));
         }
     }
 
@@ -199,7 +205,4 @@ public class SessionStore {
                 Integer.class, household, user) > 0;
     }
 
-    private static Instant instant(Timestamp timestamp) {
-        return timestamp == null ? null : timestamp.toInstant();
-    }
 }

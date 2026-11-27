@@ -20,7 +20,7 @@ class MessageServiceTest {
         assertEquals("Шығын қосу", messageService.getMessage("command.shygyn.description"));
         assertEquals("Кім кімге қарыз", messageService.getMessage("command.qaryz.description"));
         assertEquals("Баланс", messageService.getMessage("command.balans.description"));
-        assertEquals("Қарызды жабу", messageService.getMessage("command.tolem.description"));
+        assertEquals("Төлемді растауды сұрау", messageService.getMessage("command.tolem.description"));
         assertEquals("Жазбаны өшіру", messageService.getMessage("command.oshiru.description"));
     }
 

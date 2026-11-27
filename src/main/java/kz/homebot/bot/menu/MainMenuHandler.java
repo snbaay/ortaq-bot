@@ -59,9 +59,10 @@ public class MainMenuHandler implements CallbackRouter.Handler {
     @Override
     public void handle(CallbackRouter.Call call) {
         var state = sessions.withButton(call, "menu", (session, action) -> {
-            if ("main".equals(session.state()) && MENUS.containsKey(action)
-                    || "shortcut".equals(session.state()) && "home".equals(action)) {
-                return new Navigation(action, session.state());
+            if (session.userId() == null) {
+                boolean available = "main".equals(session.state()) && MENUS.containsKey(action)
+                        || "shortcut".equals(session.state()) && "home".equals(action);
+                return available ? new Navigation(action, session.state()) : null;
             }
             List<String> children = MENUS.getOrDefault(session.state(), List.of());
             if ("home".equals(action) || "back".equals(action) || "cancel".equals(action) || children.contains(action)) {

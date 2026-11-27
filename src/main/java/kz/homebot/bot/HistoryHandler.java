@@ -1,5 +1,6 @@
 package kz.homebot.bot;
 
+import kz.homebot.bot.menu.RepaymentMenu;
 import kz.homebot.domain.Expense;
 import kz.homebot.domain.Household;
 import kz.homebot.domain.Member;
@@ -24,17 +25,19 @@ public class HistoryHandler implements CommandHandler {
     private final MemberRepository memberRepository;
     private final MessageService messageService;
     private final MoneyFormatter moneyFormatter;
+    private final RepaymentMenu repayments;
 
     public HistoryHandler(ExpenseService expenseService,
                           HouseholdRepository householdRepository,
                           MemberRepository memberRepository,
                           MessageService messageService,
-                          MoneyFormatter moneyFormatter) {
+                          MoneyFormatter moneyFormatter, RepaymentMenu repayments) {
         this.expenseService = expenseService;
         this.householdRepository = householdRepository;
         this.memberRepository = memberRepository;
         this.messageService = messageService;
         this.moneyFormatter = moneyFormatter;
+        this.repayments = repayments;
     }
 
     @Override
@@ -89,6 +92,10 @@ public class HistoryHandler implements CommandHandler {
             case NOT_FOUND -> ctx.reply(messageService.getMessage("oshiru.notFound"));
             case MANAGED -> {
                 var entry = expenseService.entry(household, id);
+                if (entry.filter(e -> "repayment".equals(e.getLinkedWorkflow())).isPresent()
+                        && repayments.correctExpense(ctx, sender, id)) {
+                    return;
+                }
                 ctx.reply(messageService.getMessage(entry.filter(e -> "purchase".equals(e.getLinkedWorkflow())
                         && e.getPayer().getId().equals(sender.getId())).isPresent() ? "purchase.useCorrection" : "v2.denied"));
             }

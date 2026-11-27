@@ -4,9 +4,8 @@ import kz.homebot.domain.Household;
 import kz.homebot.domain.Member;
 import kz.homebot.repository.HouseholdRepository;
 import kz.homebot.repository.MemberRepository;
-import kz.homebot.service.ExpenseService;
+import kz.homebot.bot.menu.RepaymentMenu;
 import kz.homebot.service.MessageService;
-import kz.homebot.service.MoneyFormatter;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -19,25 +18,17 @@ import java.util.stream.Collectors;
 @Component
 public class RepaymentHandler implements CommandHandler {
 
-    private final ExpenseService expenseService;
+    private final RepaymentMenu repaymentMenu;
     private final HouseholdRepository householdRepository;
     private final MemberRepository memberRepository;
     private final MessageService messageService;
-    private final MoneyFormatter moneyFormatter;
-    private final BalanceHandler balanceHandler;
 
-    public RepaymentHandler(ExpenseService expenseService,
-                            HouseholdRepository householdRepository,
-                            MemberRepository memberRepository,
-                            MessageService messageService,
-                            MoneyFormatter moneyFormatter,
-                            BalanceHandler balanceHandler) {
-        this.expenseService = expenseService;
+    public RepaymentHandler(RepaymentMenu repaymentMenu, HouseholdRepository householdRepository,
+                            MemberRepository memberRepository, MessageService messageService) {
+        this.repaymentMenu = repaymentMenu;
         this.householdRepository = householdRepository;
         this.memberRepository = memberRepository;
         this.messageService = messageService;
-        this.moneyFormatter = moneyFormatter;
-        this.balanceHandler = balanceHandler;
     }
 
     @Override
@@ -127,16 +118,7 @@ public class RepaymentHandler implements CommandHandler {
             return;
         }
 
-        String desc = messageService.getMessage("expense.settlement.description");
-        expenseService.recordRepayment(household, senderMember, recipient, amount, desc);
-
-        String successMsg = messageService.getMessage("tolem.success",
-                senderMember.getDisplayName(),
-                recipient.getDisplayName(),
-                moneyFormatter.format(amount));
-
-        String qaryzMsg = balanceHandler.buildQaryzText(household);
-        ctx.reply(successMsg + "\n\n" + qaryzMsg);
+        repaymentMenu.fromCommand(ctx, senderMember, recipient, amount);
     }
 
     private BigDecimal parseAmount(String str) {

@@ -72,13 +72,21 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
     @Override
     public void open(String action, CallbackRouter.Call call) {
         InteractionSession session = sessions.withOwned(call.member(), call.message().getChatId(), KIND, "basket",
-                write(PurchaseDraft.EMPTY), row -> row.version() == 0 ? row : resumeChoice(row));
+                write(PurchaseDraft.EMPTY), row -> row.version() == 0
+                        ? sessions.advance(row, "basket", row.payload(), false) : resumeChoice(row));
         render(session, call.member(), call.output(), null);
     }
 
     @Override
+    public void backToBasket(CallbackRouter.Call call) {
+        var row = sessions.withOwned(call.member(), call.message().getChatId(), KIND, "basket", write(PurchaseDraft.EMPTY),
+                current -> sessions.advance(current, "basket", current.payload(), false));
+        render(row, call.member(), call.output(), null);
+    }
+
+    @Override
     public void choose(String action, CallbackRouter.Call call) {
-        boolean custom = "custom".equals(action);
+        boolean custom = ProductCatalog.CUSTOM.equals(action);
         var recent = action.startsWith("p:r:") ? purchases.recent(call.member()).stream()
                 .filter(item -> action.equals("p:r:" + Long.toString(item.id(), 36))).findFirst().orElse(null) : null;
         String key = recent != null ? recent.catalogKey() : custom ? null : action.substring(2);
@@ -136,7 +144,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         } else if ("receiptHistory".equals(row.state())) {
             showHistory(call, 0);
         } else if ("catalog".equals(row.state())) {
-            catalog.open("catalog", call);
+            catalog.fromBasket(call);
         } else {
             render(row, call.member(), call.output(), change.error());
         }

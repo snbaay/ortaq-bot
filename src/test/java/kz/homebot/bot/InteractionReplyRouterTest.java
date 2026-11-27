@@ -4,6 +4,7 @@ import kz.homebot.bot.interaction.InteractionReplyRouter;
 import kz.homebot.bot.interaction.SessionStore;
 import kz.homebot.domain.Household;
 import kz.homebot.domain.Member;
+import kz.homebot.repository.UtcTimestamp;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.service.MessageService;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.telegram.telegrambots.meta.api.objects.chat.Chat;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,13 +65,13 @@ class InteractionReplyRouterTest {
         verify(handler).replyKind();
         verify(handler).reply(argThat(row -> row.id().equals(original.id())), eq(owner), eq(correct), eq(output));
 
-        jdbc.update("UPDATE interaction_session SET prompt_expires_at = CURRENT_TIMESTAMP - INTERVAL '1' MINUTE");
+        jdbc.update("UPDATE interaction_session SET prompt_expires_at = ?", UtcTimestamp.from(Instant.now().minusSeconds(60)));
         restarted.route(correct, output);
         verify(output).send(-100L, "expired", null);
         verifyNoMoreInteractions(handler);
 
         assertThat(sessions.open(owner, -100L, "purchase", "price", "{}").id()).isEqualTo(original.id());
-        jdbc.update("UPDATE interaction_session SET expires_at = CURRENT_TIMESTAMP - INTERVAL '1' MINUTE");
+        jdbc.update("UPDATE interaction_session SET expires_at = ?", UtcTimestamp.from(Instant.now().minusSeconds(60)));
         assertThat(sessions.open(owner, -100L, "purchase", "price", "{}").id()).isNotEqualTo(original.id());
     }
 

@@ -49,11 +49,11 @@ public class MenuViews {
         }
     }
 
-    private static InlineKeyboardRow row(String caption, String data) {
+    static InlineKeyboardRow row(String caption, String data) {
         return new InlineKeyboardRow(InlineKeyboardButton.builder().text(caption).callbackData(data).build());
     }
 
-    private static InlineKeyboardMarkup keyboard(List<InlineKeyboardRow> rows) {
+    static InlineKeyboardMarkup keyboard(List<InlineKeyboardRow> rows) {
         return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 

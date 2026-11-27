@@ -12,7 +12,7 @@ Ortaq is a Telegram bot for roommates sharing a household. One Telegram group is
 | `/shygyn 3000 пицца @user` | Split among mentioned members and the payer |
 | `/balans` | Show every member's net balance |
 | `/qaryz` | Show transfers needed to settle balances |
-| `/tolem Асан 500` | Record a repayment; the name can be omitted with two members |
+| `/tolem Асан 500` | Request confirmation from the recipient. With two household members, the name is optional. |
 | `/oshiru` or `/oshiru 12` | Undo your last entry or your entry by ID |
 | `/tarih` | Show the last 10 expenses and repayments |
 | `/esep` or `/esep 9` | Show this month's or September's report |

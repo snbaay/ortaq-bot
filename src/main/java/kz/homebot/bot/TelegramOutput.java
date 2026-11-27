@@ -1,5 +1,6 @@
 package kz.homebot.bot;
 
+import kz.homebot.config.Limits;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -38,6 +39,13 @@ public class TelegramOutput {
     }
 
     public Message send(Long chatId, String text, ReplyKeyboard keyboard) {
+        if (text.length() > Limits.TELEGRAM_MESSAGE) {
+            int end = Limits.TELEGRAM_MESSAGE - 1;
+            if (Character.isHighSurrogate(text.charAt(end - 1))) {
+                end--;
+            }
+            text = text.substring(0, end) + "…";
+        }
         try {
             return client.execute(SendMessage.builder().chatId(chatId).text(text).replyMarkup(keyboard).build());
         } catch (TelegramApiException e) {

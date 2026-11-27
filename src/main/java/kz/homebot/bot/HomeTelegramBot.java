@@ -105,6 +105,10 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         this.menus = menus;
     }
 
+    TelegramOutput output() {
+        return output;
+    }
+
     @Override
     public String getBotToken() {
         return botToken;

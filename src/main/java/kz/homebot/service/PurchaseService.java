@@ -3,12 +3,13 @@ package kz.homebot.service;
 import kz.homebot.config.Limits;
 import kz.homebot.domain.Member;
 import kz.homebot.repository.MemberRepository;
+import kz.homebot.repository.UtcTimestamp;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.Instant;
 
 import java.util.Comparator;
@@ -63,7 +64,7 @@ public class PurchaseService {
         }
         Long linkedExpense = expenseId;
         var generated = new GeneratedKeyHolder();
-        var now = Timestamp.from(Instant.now());
+        var now = UtcTimestamp.from(Instant.now());
         jdbc.update(connection -> {
             var statement = connection.prepareStatement("""
                     INSERT INTO purchase(household_id, buyer_member_id, status, shared, total, purchased_at,
@@ -74,9 +75,9 @@ public class PurchaseService {
             statement.setLong(2, buyer.getId());
             statement.setBoolean(3, shared);
             statement.setBigDecimal(4, draft.total());
-            statement.setTimestamp(5, now);
-            statement.setTimestamp(6, now);
-            statement.setTimestamp(7, now);
+            statement.setObject(5, now);
+            statement.setObject(6, now);
+            statement.setObject(7, now);
             statement.setObject(8, linkedExpense);
             statement.setString(9, key);
             var photo = draft.photo();
@@ -122,7 +123,7 @@ public class PurchaseService {
             String file = row.getString("receipt_file_id");
             return new ReceiptDetail(id, row.getLong("buyer_member_id"), row.getString("buyer_name"),
                     row.getString("status"), row.getBoolean("shared"), row.getBigDecimal("total"),
-                    row.getTimestamp("purchased_at").toInstant(), row.getObject("expense_id", Long.class),
+                    UtcTimestamp.instant(row.getObject("purchased_at", LocalDateTime.class)), row.getObject("expense_id", Long.class),
                     file == null ? null : new PurchaseDraft.Photo(file, row.getString("receipt_mime"), row.getLong("receipt_bytes")),
                     List.of(), List.of());
         }, id, home).stream().findFirst().map(receipt -> {

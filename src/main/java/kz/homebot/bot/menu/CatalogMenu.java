@@ -43,20 +43,25 @@ public class CatalogMenu implements CallbackRouter.Handler, MainMenuHandler.Dest
 
     @Override
     public void open(String action, CallbackRouter.Call call) {
-        show(sessions.navigate(call.member(), call.message().getChatId(), KIND, action, "{}"), call);
+        show(sessions.navigate(call.member(), call.message().getChatId(), KIND, action, "products"), call);
+    }
+
+    public void fromBasket(CallbackRouter.Call call) {
+        show(sessions.navigate(call.member(), call.message().getChatId(), KIND, KIND, "basket"), call);
     }
 
     @Override
     public void handle(CallbackRouter.Call call) {
         var next = sessions.withButton(call, KIND, (session, action) -> {
             if ("home".equals(action) || "back".equals(action) || "cancel".equals(action)) {
-                String nextState = "back".equals(action) ? (KIND.equals(session.state()) ? "products" : KIND) : "home";
-                return sessions.advance(session, nextState, "{}", !KIND.equals(nextState));
+                String parent = "basket".equals(session.payload()) ? "basket" : "products";
+                String nextState = "back".equals(action) ? (KIND.equals(session.state()) ? parent : KIND) : "home";
+                return sessions.advance(session, nextState, session.payload(), !KIND.equals(nextState));
             }
             if ("recent".equals(action) || categoryPage(action) != null) {
-                return sessions.advance(session, action, "{}", false);
+                return sessions.advance(session, action, session.payload(), false);
             }
-            if ("custom".equals(action) && KIND.equals(session.state())
+            if (ProductCatalog.CUSTOM.equals(action) && KIND.equals(session.state())
                     || action.startsWith("p:") && offered(session, action.substring(2), call)) {
                 return sessions.advance(session, "selected", action, true);
             }
@@ -69,6 +74,7 @@ public class CatalogMenu implements CallbackRouter.Handler, MainMenuHandler.Dest
         call.answer().send(null);
         var session = next.get();
         switch (session.state()) {
+            case "basket" -> selection.ifAvailable(target -> target.backToBasket(call));
             case "products" -> mainMenu.submenu(call, "products", messages.getMessage("v2.empty"));
             case "home" -> views.main(call.member(), session.chatId(), messages.getMessage("menu.title"), call.output());
             case "selected" -> {
@@ -91,7 +97,7 @@ public class CatalogMenu implements CallbackRouter.Handler, MainMenuHandler.Dest
             buttons.add(new MenuViews.Button("menu.recent", "recent"));
             catalog.categories().forEach(category -> buttons.add(new MenuViews.Button(
                     "catalog.category." + category.key(), "v:" + category.key() + ":0")));
-            buttons.add(new MenuViews.Button("catalog.custom", "custom"));
+            buttons.add(new MenuViews.Button("catalog.custom", ProductCatalog.CUSTOM));
         } else if ("recent".equals(session.state())) {
             var recent = recent(call);
             title = messages.getMessage("menu.recent") + (recent.isEmpty() ? "\n" + messages.getMessage("v2.empty") : "");
@@ -141,6 +147,7 @@ public class CatalogMenu implements CallbackRouter.Handler, MainMenuHandler.Dest
 
     public interface Selection {
         void choose(String action, CallbackRouter.Call call);
+        void backToBasket(CallbackRouter.Call call);
         default List<RecentProduct> recent(CallbackRouter.Call call) {
             return List.of();
         }

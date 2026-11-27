@@ -2,6 +2,7 @@ package kz.homebot.bot;
 
 import kz.homebot.bot.callback.CallbackRouter;
 import kz.homebot.bot.callback.ProcessedUpdates;
+import kz.homebot.bot.interaction.InteractionReplyRouter;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.config.AllowedChats;
 import kz.homebot.service.MessageService;
@@ -44,6 +45,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     private final TelegramOutput output;
     private final CallbackRouter callbacks;
     private final ProcessedUpdates updates;
+    private final InteractionReplyRouter replies;
     private final AllowedChats allowedChats;
 
     @Autowired
@@ -54,9 +56,9 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             MemberRegistrationService memberRegistrationService,
             CommandParser commandParser,
             CommandRouter commandRouter,
-            AllowedChats allowedChats, CallbackRouter callbacks, ProcessedUpdates updates) {
+            AllowedChats allowedChats, CallbackRouter callbacks, ProcessedUpdates updates, InteractionReplyRouter replies) {
         this(botToken, botUsername, messageService, memberRegistrationService, commandParser, commandRouter,
-                new OkHttpTelegramClient(botToken), allowedChats, callbacks, updates);
+                new OkHttpTelegramClient(botToken), allowedChats, callbacks, updates, replies);
     }
 
     // Secondary constructor for testing (inject TelegramClient directly)
@@ -78,13 +80,13 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                            CommandRouter commandRouter, ExpenseHandler expenseHandler,
                            TelegramClient telegramClient, AllowedChats allowedChats) {
         this(botToken, botUsername, messageService, memberRegistrationService, commandParser, commandRouter,
-                telegramClient, allowedChats, null, null);
+                telegramClient, allowedChats, null, null, null);
     }
 
     public HomeTelegramBot(String botToken, String botUsername, MessageService messageService,
                            MemberRegistrationService memberRegistrationService, CommandParser commandParser,
                            CommandRouter commandRouter, TelegramClient telegramClient, AllowedChats allowedChats,
-                           CallbackRouter callbacks, ProcessedUpdates updates) {
+                           CallbackRouter callbacks, ProcessedUpdates updates, InteractionReplyRouter replies) {
         this.botToken = botToken;
         this.botUsername = botUsername;
         this.messageService = messageService;
@@ -96,6 +98,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         this.output = new TelegramOutput(telegramClient);
         this.callbacks = callbacks;
         this.updates = updates;
+        this.replies = replies;
     }
 
     @Override
@@ -133,13 +136,16 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             }
             return;
         }
-        if (!update.hasMessage() || !update.getMessage().hasText()) {
+        if (!update.hasMessage()) {
             return;
         }
 
         Message message = update.getMessage();
         Chat chat = message.getChat();
-        String text = message.getText().trim();
+        if (chat == null) {
+            return;
+        }
+        String text = message.hasText() ? message.getText().trim() : "";
         Long chatId = message.getChatId();
         if (!allowedChats.allows(chatId)) {
             log.debug("Ignoring update from chat {}", chatId);
@@ -156,7 +162,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                 || Boolean.TRUE.equals(from.getIsBot()) || message.getSenderChat() != null)) {
             return;
         }
-        if (isGroup && from != null) {
+        if (isGroup && message.hasText()) {
             memberRegistrationService.registerMember(chatId, chat.getTitle(), from);
         }
 
@@ -181,6 +187,8 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                     text
             );
             commandRouter.route(routedCtx);
+        } else if (isGroup && replies != null && !text.startsWith("/")) {
+            replies.route(message, output);
         }
     }
 

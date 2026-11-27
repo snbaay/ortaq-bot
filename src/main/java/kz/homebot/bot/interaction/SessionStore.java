@@ -68,6 +68,13 @@ public class SessionStore {
         return advance(session, state, payload, false);
     }
 
+    @Transactional
+    public <T> T withOwned(Member member, long chat, String kind, String state, String payload,
+                          Function<InteractionSession, T> action) {
+        var row = open(member, chat, kind, state, payload);
+        return action.apply(lock(row.id()).orElseThrow());
+    }
+
     public boolean bindMenu(InteractionSession session, int messageId) {
         return jdbc.update("""
                 UPDATE interaction_session SET menu_message_id = ? WHERE id = ? AND version = ?

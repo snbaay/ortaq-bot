@@ -20,7 +20,7 @@ class PurchaseSharingTest {
         roommate.setId(2L);
         var members = mock(MemberRepository.class);
         when(members.findByHousehold(household)).thenReturn(List.of(buyer, roommate));
-        var purchases = new PurchaseService(members, null, null, null);
+        var purchases = new PurchaseService(members, null, null, null, null);
 
         assertThat(purchases.participants(buyer, PurchaseDraft.EMPTY)).containsExactly(buyer, roommate);
         assertThat(purchases.participants(buyer, purchases.toggleParticipant(buyer, PurchaseDraft.EMPTY, 2L)))

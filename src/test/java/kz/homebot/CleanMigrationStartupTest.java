@@ -5,6 +5,8 @@ import kz.homebot.service.DigestJob;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.service.PurchaseDraft;
 import kz.homebot.service.PurchaseService;
+import kz.homebot.service.ExpenseService;
+import kz.homebot.service.ShoppingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,6 +33,8 @@ class CleanMigrationStartupTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired MemberRegistrationService registration;
     @Autowired PurchaseService purchases;
+    @Autowired ShoppingService shopping;
+    @Autowired ExpenseService expenses;
 
     @Test
     void racingConfirmationsReturnOneReceiptAndOneExactLedgerExpense() throws Exception {
@@ -94,6 +98,30 @@ class CleanMigrationStartupTest {
         assertThat(receipt.lines()).extracting(PurchaseDraft.Line::label).containsExactly("өшкен");
         assertThat(purchases.receipt(outsider, id)).isEmpty();
         assertThat(purchases.recent(outsider)).isEmpty();
+    }
+
+    @Test
+    void listMarkingAndBuyerOnlyVoidKeepTheLegacyLedgerConsistent() {
+        var buyer = registration.registerMember(-214L, "List", 84L, "Buyer", null);
+        var roommate = registration.registerMember(-214L, "List", 85L, "Roommate", null);
+        var household = buyer.getHousehold();
+        long listId = shopping.add(household, buyer, "сүт").getFirst().getId();
+        var draft = PurchaseDraft.EMPTY.input("milk", "сүт", null).price(new BigDecimal("25.50"))
+                .shopping(java.util.List.of(listId));
+        var receipt = purchases.confirm(buyer, "d".repeat(32), draft);
+        assertThat(shopping.open(household)).isEmpty();
+        assertThat(shopping.buy(household, buyer, listId)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM purchase_shopping_item WHERE purchase_id = ?",
+                Integer.class, receipt.id())).isEqualTo(1);
+
+        assertThat(purchases.voidReceipt(roommate, receipt.id())).isFalse();
+        assertThat(expenses.deleteEntryById(household, buyer, receipt.expenseId())).isEqualTo(ExpenseService.DeleteResult.MANAGED);
+        assertThat(purchases.voidReceipt(buyer, receipt.id())).isTrue();
+        assertThat(purchases.voidReceipt(buyer, receipt.id())).isTrue();
+        assertThat(purchases.receipt(buyer, receipt.id()).orElseThrow().status()).isEqualTo("VOID");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM expense WHERE household_id = ? AND NOT deleted",
+                Integer.class, household.getId())).isZero();
+        assertThat(purchases.recent(buyer)).isEmpty();
     }
 
     @Test

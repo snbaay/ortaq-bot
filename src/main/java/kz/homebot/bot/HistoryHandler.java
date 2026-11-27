@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
+
 
 @Component
 public class HistoryHandler implements CommandHandler {
@@ -82,6 +82,19 @@ public class HistoryHandler implements CommandHandler {
         ctx.reply(sb.toString().trim());
     }
 
+    private void undo(CommandContext ctx, Household household, Member sender, long id) {
+        switch (expenseService.deleteEntryById(household, sender, id)) {
+            case SUCCESS -> ctx.reply(messageService.getMessage("oshiru.success"));
+            case NOT_OWNER -> ctx.reply(messageService.getMessage("oshiru.notOwner"));
+            case NOT_FOUND -> ctx.reply(messageService.getMessage("oshiru.notFound"));
+            case MANAGED -> {
+                var entry = expenseService.entry(household, id);
+                ctx.reply(messageService.getMessage(entry.filter(e -> "purchase".equals(e.getLinkedWorkflow())
+                        && e.getPayer().getId().equals(sender.getId())).isPresent() ? "purchase.useCorrection" : "v2.denied"));
+            }
+        }
+    }
+
     private void handleOshiru(CommandContext ctx, Household household) {
         Member senderMember = memberRepository.findByHouseholdAndTelegramUserId(household, ctx.sender().id()).orElse(null);
         if (senderMember == null) {
@@ -91,21 +104,16 @@ public class HistoryHandler implements CommandHandler {
 
         String args = ctx.args().trim();
         if (args.isEmpty()) {
-            Optional<Expense> deleted = expenseService.deleteLastEntry(household, senderMember);
-            if (deleted.isPresent()) {
-                ctx.reply(messageService.getMessage("oshiru.success"));
+            var entry = expenseService.lastOwnedEntry(household, senderMember);
+            if (entry.isPresent()) {
+                undo(ctx, household, senderMember, entry.get().getId());
             } else {
                 ctx.reply(messageService.getMessage("oshiru.empty"));
             }
         } else {
             try {
                 Long id = Long.parseLong(args);
-                ExpenseService.DeleteResult res = expenseService.deleteEntryById(household, senderMember, id);
-                switch (res) {
-                    case SUCCESS -> ctx.reply(messageService.getMessage("oshiru.success"));
-                    case NOT_OWNER -> ctx.reply(messageService.getMessage("oshiru.notOwner"));
-                    case NOT_FOUND -> ctx.reply(messageService.getMessage("oshiru.notFound"));
-                }
+                undo(ctx, household, senderMember, id);
             } catch (NumberFormatException e) {
                 ctx.reply(messageService.getMessage("oshiru.notFound"));
             }

@@ -7,13 +7,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public record PurchaseDraft(List<Line> lines, String product, String label, Integer index,
-                            boolean personal, List<Long> participantIds, Photo photo) {
+                            boolean personal, List<Long> participantIds, Photo photo, List<Long> shoppingIds) {
     public static final int MAX_LINES = 20;
-    public static final PurchaseDraft EMPTY = new PurchaseDraft(List.of(), null, null, null, false, null, null);
+    public static final PurchaseDraft EMPTY = new PurchaseDraft(List.of(), null, null, null, false, null, null, List.of());
 
     public PurchaseDraft {
         lines = List.copyOf(lines);
         participantIds = participantIds == null ? null : List.copyOf(participantIds);
+        shoppingIds = shoppingIds == null ? List.of() : List.copyOf(shoppingIds);
     }
 
     public static BigDecimal parsePrice(String text) {
@@ -29,7 +30,7 @@ public record PurchaseDraft(List<Line> lines, String product, String label, Inte
     }
 
     public PurchaseDraft input(String product, String label, Integer index) {
-        return new PurchaseDraft(lines, product, label, index, personal, participantIds, photo);
+        return new PurchaseDraft(lines, product, label, index, personal, participantIds, photo, shoppingIds);
     }
 
     public PurchaseDraft price(BigDecimal price) {
@@ -40,21 +41,25 @@ public record PurchaseDraft(List<Line> lines, String product, String label, Inte
             var old = newLines.get(index);
             newLines.set(index, new Line(old.product(), old.label(), price));
         }
-        return new PurchaseDraft(newLines, null, null, null, personal, participantIds, photo);
+        return new PurchaseDraft(newLines, null, null, null, personal, participantIds, photo, shoppingIds);
     }
 
     public PurchaseDraft remove() {
         var newLines = new ArrayList<>(lines);
         newLines.remove((int) index);
-        return new PurchaseDraft(newLines, null, null, null, personal, participantIds, photo);
+        return new PurchaseDraft(newLines, null, null, null, personal, participantIds, photo, shoppingIds);
     }
 
     public PurchaseDraft sharing(boolean personal, List<Long> participants) {
-        return new PurchaseDraft(lines, product, label, index, personal, participants, photo);
+        return new PurchaseDraft(lines, product, label, index, personal, participants, photo, shoppingIds);
     }
 
     public PurchaseDraft attach(Photo receipt) {
-        return new PurchaseDraft(lines, product, label, index, personal, participantIds, receipt);
+        return new PurchaseDraft(lines, product, label, index, personal, participantIds, receipt, shoppingIds);
+    }
+
+    public PurchaseDraft shopping(List<Long> shoppingIds) {
+        return new PurchaseDraft(lines, product, label, index, personal, participantIds, photo, shoppingIds);
     }
 
     public record Photo(String fileId, String mime, long bytes) {

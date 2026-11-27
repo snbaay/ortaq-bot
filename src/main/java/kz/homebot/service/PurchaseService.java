@@ -23,12 +23,14 @@ public class PurchaseService {
     private final JdbcTemplate jdbc;
     private final ExpenseService expenses;
     private final MessageService messages;
+    private final ShoppingService shopping;
 
-    public PurchaseService(MemberRepository members, JdbcTemplate jdbc, ExpenseService expenses, MessageService messages) {
+    public PurchaseService(MemberRepository members, JdbcTemplate jdbc, ExpenseService expenses, MessageService messages, ShoppingService shopping) {
         this.members = members;
         this.jdbc = jdbc;
         this.expenses = expenses;
         this.messages = messages;
+        this.shopping = shopping;
     }
 
     @Transactional
@@ -52,8 +54,14 @@ public class PurchaseService {
         }
         var participants = participants(buyer, draft);
         boolean shared = !draft.personal();
-        Long expenseId = shared ? expenses.addExpense(buyer.getHousehold(), buyer, draft.total(),
-                messages.getMessage("purchase.ledgerDescription", draft.lines().size()), participants).expense().getId() : null;
+        Long expenseId = null;
+        if (shared) {
+            var expense = expenses.addExpense(buyer.getHousehold(), buyer, draft.total(),
+                    messages.getMessage("purchase.ledgerDescription", draft.lines().size()), participants).expense();
+            expense.setLinkedWorkflow("purchase");
+            expenseId = expense.getId();
+        }
+        Long linkedExpense = expenseId;
         var generated = new GeneratedKeyHolder();
         var now = Timestamp.from(Instant.now());
         jdbc.update(connection -> {
@@ -69,7 +77,7 @@ public class PurchaseService {
             statement.setTimestamp(5, now);
             statement.setTimestamp(6, now);
             statement.setTimestamp(7, now);
-            statement.setObject(8, expenseId);
+            statement.setObject(8, linkedExpense);
             statement.setString(9, key);
             var photo = draft.photo();
             statement.setString(10, photo == null ? null : photo.fileId());
@@ -85,6 +93,12 @@ public class PurchaseService {
         }
         for (var participant : participants) {
             jdbc.update("INSERT INTO purchase_participant(purchase_id, member_id) VALUES (?, ?)", receiptId, participant.getId());
+        }
+        for (long item : draft.shoppingIds().stream().distinct().sorted().toList()) {
+            if (!shopping.buy(buyer.getHousehold(), buyer, item)) {
+                throw new ShoppingChanged();
+            }
+            jdbc.update("INSERT INTO purchase_shopping_item(purchase_id, shopping_item_id) VALUES (?, ?)", receiptId, item);
         }
         return new Receipt(receiptId, expenseId);
     }
@@ -143,6 +157,34 @@ public class PurchaseService {
                 ) products WHERE label_rank = 1 ORDER BY purchase_order DESC, position DESC LIMIT 5
                 """, (row, number) -> new RecentProduct(row.getLong(1), row.getString(2), row.getString(3)), viewer.getHousehold().getId());
     }
+
+    @Transactional
+    public boolean voidReceipt(Member buyer, long id) {
+        requireViewer(buyer);
+        long home = buyer.getHousehold().getId();
+        var status = jdbc.query("""
+                SELECT status, expense_id FROM purchase WHERE household_id = ? AND id = ? AND buyer_member_id = ? FOR UPDATE
+                """, (row, number) -> new VoidTarget(row.getString(1), row.getObject(2, Long.class)), home, id, buyer.getId());
+        if (status.isEmpty()) {
+            return false;
+        }
+        var target = status.getFirst();
+        if ("VOID".equals(target.status())) {
+            return true;
+        }
+        if (target.expenseId() != null && !expenses.reverseLinked(buyer.getHousehold(), target.expenseId(), "purchase")) {
+            throw new IllegalStateException("Purchase ledger link is invalid");
+        }
+        jdbc.update("UPDATE purchase SET status = 'VOID', version = version + 1 WHERE id = ?", id);
+        return true;
+    }
+
+    public List<kz.homebot.domain.ShoppingItem> shoppingItems(Member buyer) {
+        return shopping.open(buyer.getHousehold());
+    }
+
+    public static final class ShoppingChanged extends RuntimeException {}
+    private record VoidTarget(String status, Long expenseId) {}
 
     private void requireViewer(Member viewer) {
         jdbc.queryForObject("""

@@ -132,6 +132,7 @@ public class ExpenseService {
     @Transactional
     public Optional<Expense> deleteLastEntry(Household household, Member member) {
         Optional<Expense> last = expenseRepository.findFirstByHouseholdAndPayerAndDeletedFalseOrderByIdDesc(household, member);
+        last = last.filter(entry -> entry.getLinkedWorkflow() == null);
         last.ifPresent(e -> {
             e.setDeleted(true);
             expenseRepository.save(e);
@@ -142,7 +143,8 @@ public class ExpenseService {
     public enum DeleteResult {
         SUCCESS,
         NOT_FOUND,
-        NOT_OWNER
+        NOT_OWNER,
+        MANAGED
     }
 
     /**
@@ -155,12 +157,35 @@ public class ExpenseService {
             return DeleteResult.NOT_FOUND;
         }
         Expense expense = opt.get();
+        if (expense.getLinkedWorkflow() != null) {
+            return DeleteResult.MANAGED;
+        }
         if (!expense.getPayer().getId().equals(member.getId())) {
             return DeleteResult.NOT_OWNER;
         }
         expense.setDeleted(true);
         expenseRepository.save(expense);
         return DeleteResult.SUCCESS;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Expense> lastOwnedEntry(Household household, Member member) {
+        return expenseRepository.findFirstByHouseholdAndPayerAndDeletedFalseOrderByIdDesc(household, member);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Expense> entry(Household household, long id) {
+        return expenseRepository.findByIdAndHousehold(id, household);
+    }
+
+    @Transactional
+    public boolean reverseLinked(Household household, long id, String workflow) {
+        var expense = expenseRepository.findByIdAndHousehold(id, household).orElse(null);
+        if (expense == null || expense.isDeleted() || !workflow.equals(expense.getLinkedWorkflow())) {
+            return false;
+        }
+        expense.setDeleted(true);
+        return true;
     }
 
     /** Result DTO carrying the saved expense, member list and their shares (same order). */

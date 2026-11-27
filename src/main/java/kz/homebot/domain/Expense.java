@@ -114,6 +114,17 @@ public class Expense {
         this.createdAt = createdAt;
     }
 
+    @Column(name = "linked_workflow", length = 16)
+    private String linkedWorkflow;
+
+    public String getLinkedWorkflow() {
+        return linkedWorkflow;
+    }
+
+    public void setLinkedWorkflow(String linkedWorkflow) {
+        this.linkedWorkflow = linkedWorkflow;
+    }
+
     public boolean isDeleted() {
         return deleted;
     }

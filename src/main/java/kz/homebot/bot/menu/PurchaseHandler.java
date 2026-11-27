@@ -72,7 +72,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
     @Override
     public void open(String action, CallbackRouter.Call call) {
         InteractionSession session = sessions.withOwned(call.member(), call.message().getChatId(), KIND, "basket",
-                write(PurchaseDraft.EMPTY), row -> sessions.advance(row, "basket", row.payload(), false));
+                write(PurchaseDraft.EMPTY), row -> row.version() == 0 ? row : resumeChoice(row));
         render(session, call.member(), call.output(), null);
     }
 
@@ -89,6 +89,9 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         }
         var change = sessions.withOwned(call.member(), call.message().getChatId(), KIND, "basket", write(PurchaseDraft.EMPTY), row -> {
             var draft = read(row);
+            if (List.of("name", "price", "editPrice", "photo").contains(row.state()) || row.state().startsWith("resume:")) {
+                return new Change(resumeChoice(row), null);
+            }
             if (draft.lines().size() >= PurchaseDraft.MAX_LINES) {
                 return new Change(sessions.advance(row, "basket", write(draft), false), "purchase.lineLimit");
             }
@@ -106,13 +109,21 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
 
     @Override
     public void handle(CallbackRouter.Call call) {
-        if (call.data().contains(":h:") || call.data().contains(":r:") || call.data().contains(":showPhoto")) {
+        String[] payload = call.data().split(":", 3);
+        String action = payload.length == 3 ? payload[2] : "";
+        if (action.startsWith("h:") || action.startsWith("r:") || List.of("showPhoto", "void", "voidYes").contains(action)) {
             receiptButton(call);
             return;
         }
-        boolean confirm = call.data().endsWith(":confirm");
-        var result = confirm ? sessions.withConfirmation(call, KIND, (row, action) -> confirm(row, call.member()))
-                : sessions.withButton(call, KIND, (row, action) -> button(row, action, call.member()));
+        boolean confirm = "confirm".equals(action);
+        java.util.Optional<Change> result;
+        try {
+            result = confirm ? sessions.withConfirmation(call, KIND, (row, key) -> confirm(row, call.member()))
+                    : sessions.withButton(call, KIND, (row, key) -> button(row, key, call.member()));
+        } catch (PurchaseService.ShoppingChanged changed) {
+            call.answer().send(messages.getMessage("purchase.listChanged"));
+            return;
+        }
         if (result.isEmpty()) {
             call.answer().send(messages.getMessage("v2.stale"));
             return;
@@ -147,9 +158,21 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         return new Change(row, null, receipt.id());
     }
 
+    private InteractionSession resumeChoice(InteractionSession row) {
+        String state = row.state().startsWith("resume:") ? row.state() : "resume:" + row.state();
+        return sessions.advance(row, state, row.payload(), false);
+    }
+
     private Change button(InteractionSession row, String action, Member buyer) {
         var draft = read(row);
         String state = row.state();
+        if ("resume".equals(action) && state.startsWith("resume:")) {
+            String previous = state.substring(7);
+            if (List.of("home", "cancel", "catalog", "receiptHistory").contains(previous)) {
+                previous = "basket";
+            }
+            return next(row, previous, draft);
+        }
         if ("home".equals(action)) {
             return next(row, "home", draft);
         }
@@ -170,6 +193,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                 case "add" -> next(row, "catalog", draft);
                 case "history" -> next(row, "receiptHistory", draft);
                 case "photo" -> next(row, "photo", draft);
+                case "shopping" -> next(row, "shopping", draft.input(null, null, 0));
                 case "edit", "remove" -> next(row, action, draft);
                 case "participants" -> draft.personal() ? null : next(row, action, draft.input(null, null, 0));
                 case "sharing" -> next(row, "basket", draft.sharing(!draft.personal(), draft.participantIds()));
@@ -177,8 +201,30 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                 default -> null;
             };
         }
+        if ("shopping".equals(state)) {
+            if ("clear".equals(action)) {
+                return next(row, state, draft.shopping(List.of()));
+            }
+            if (action.matches("s:[0-9a-z]{1,13}")) {
+                long id = Long.parseLong(action.substring(2), 36);
+                var ids = new ArrayList<>(draft.shoppingIds());
+                if (!ids.remove(id)) {
+                    if (purchases.shoppingItems(buyer).stream().noneMatch(item -> item.getId() == id)) {
+                        return new Change(row, "purchase.listChanged");
+                    }
+                    ids.add(id);
+                }
+                return next(row, state, draft.shopping(ids));
+            }
+            if (action.matches("page:[0-9]{1,5}")) {
+                int page = Integer.parseInt(action.substring(5));
+                if (page * 8 < purchases.shoppingItems(buyer).size()) {
+                    return next(row, state, draft.input(null, null, page));
+                }
+            }
+        }
         if ("participants".equals(state)) {
-            if (action.matches("t:[0-9a-z]{1,12}")) {
+            if (action.matches("t:[0-9a-z]{1,13}")) {
                 try {
                     return next(row, state, purchases.toggleParticipant(buyer, draft, Long.parseLong(action.substring(2), 36)));
                 } catch (IllegalArgumentException denied) {
@@ -274,6 +320,29 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                         : messages.getMessage("purchase.enterPrice", capitalize(draft.label()));
                 buttons.add(new MenuViews.Button("v2.retry", "retry"));
             }
+            case "shopping" -> {
+                text = messages.getMessage("purchase.markList");
+                var all = purchases.shoppingItems(member);
+                int page = draft.index();
+                int end = Math.min(all.size(), (page + 1) * 8);
+                for (int i = page * 8; i < end; i++) {
+                    var item = all.get(i);
+                    String key = draft.shoppingIds().contains(item.getId()) ? "purchase.selected" : "menu.value";
+                    buttons.add(new MenuViews.Button(key, "s:" + Long.toString(item.getId(), 36), item.getText()));
+                }
+                if (all.isEmpty()) {
+                    text += "\n" + messages.getMessage("v2.empty");
+                }
+                if (!draft.shoppingIds().isEmpty()) {
+                    buttons.add(new MenuViews.Button("purchase.clearList", "clear"));
+                }
+                if (page > 0) {
+                    buttons.add(new MenuViews.Button("catalog.previous", "page:" + (page - 1)));
+                }
+                if (end < all.size()) {
+                    buttons.add(new MenuViews.Button("catalog.next", "page:" + (page + 1)));
+                }
+            }
             case "participants" -> {
                 text = messages.getMessage("purchase.participants");
                 var selected = purchases.participants(member, draft).stream().map(Member::getId).toList();
@@ -310,6 +379,11 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
             }
             default -> {
                 text = summary(row, draft, member);
+                if (row.state().startsWith("resume:")) {
+                    text = messages.getMessage("purchase.savedDraft") + "\n\n" + text;
+                    buttons.add(new MenuViews.Button("menu.resume", "resume"));
+                    break;
+                }
                 buttons.add(new MenuViews.Button("purchase.add", "add"));
                 if (!draft.lines().isEmpty()) {
                     buttons.add(new MenuViews.Button("purchase.edit", "edit"));
@@ -321,6 +395,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                 buttons.add(new MenuViews.Button("purchase.sharing", "sharing"));
                 buttons.add(new MenuViews.Button("purchase.photo", "photo"));
                 buttons.add(new MenuViews.Button("purchase.history", "history"));
+                buttons.add(new MenuViews.Button("purchase.markList", "shopping"));
                 buttons.add(new MenuViews.Button("menu.confirm", "confirm"));
             }
         }
@@ -362,11 +437,16 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
             boolean page = action.matches("h:[0-9]{1,6}");
             boolean receipt = "history".equals(row.state()) && action.matches("r:[0-9a-z]{1,13}");
             boolean photo = "receipt".equals(row.state()) && "showPhoto".equals(action);
-            if (!page && !receipt && !photo && !"h:home".equals(action)) {
+            boolean voidPreview = "receipt".equals(row.state()) && "void".equals(action);
+            boolean voidConfirm = "voidConfirm".equals(row.state()) && "voidYes".equals(action);
+            if (!page && !receipt && !photo && !voidPreview && !voidConfirm && !"h:home".equals(action)) {
+                return null;
+            }
+            if (voidConfirm && !purchases.voidReceipt(call.member(), Long.parseLong(row.payload()))) {
                 return null;
             }
             sessions.advance(row, "closed", "{}", true);
-            return "showPhoto".equals(action) ? "photo:" + row.payload() : action;
+            return photo ? "photo:" + row.payload() : voidPreview ? "void:" + row.payload() : action;
         });
         if (result.isEmpty()) {
             call.answer().send(messages.getMessage("v2.stale"));
@@ -380,6 +460,11 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
             showHistory(call, Integer.parseInt(action.substring(2)));
         } else if (action.startsWith("r:")) {
             showReceipt(call, Long.parseLong(action.substring(2), 36), false);
+        } else if (action.startsWith("void:")) {
+            showVoid(call, Long.parseLong(action.substring(5)));
+        } else if ("voidYes".equals(action)) {
+            call.output().send(call.message().getChatId(), messages.getMessage("purchase.corrected"), null);
+            open("basket", call);
         } else {
             showReceipt(call, Long.parseLong(action.substring(6)), true);
         }
@@ -432,10 +517,25 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                 text.append("\n").append(messages.getMessage("v2.retry"));
             }
         }
+        if (receipt.buyerId() == call.member().getId() && "CONFIRMED".equals(receipt.status())) {
+            buttons.add(new MenuViews.Button("purchase.correct", "void"));
+        }
         buttons.add(new MenuViews.Button("purchase.history", "h:0"));
         buttons.add(new MenuViews.Button("menu.home", "h:home"));
         var row = sessions.navigate(call.member(), call.message().getChatId(), RECEIPTS, "receipt", number);
         views.send(row, kind(), text.toString(), buttons, call.output());
+    }
+
+    private void showVoid(CallbackRouter.Call call, long id) {
+        var target = purchases.receipt(call.member(), id).orElse(null);
+        if (target == null || target.buyerId() != call.member().getId() || !"CONFIRMED".equals(target.status())) {
+            call.output().send(call.message().getChatId(), messages.getMessage("v2.denied"), null);
+            return;
+        }
+        var row = sessions.navigate(call.member(), call.message().getChatId(), RECEIPTS, "voidConfirm", String.valueOf(id));
+        views.send(row, kind(), messages.getMessage("purchase.voidConfirm", String.valueOf(id)), List.of(
+                new MenuViews.Button("menu.confirm", "voidYes"),
+                new MenuViews.Button("menu.cancel", "h:0")), call.output());
     }
 
     static PurchaseDraft.Photo toPhoto(Message message) {

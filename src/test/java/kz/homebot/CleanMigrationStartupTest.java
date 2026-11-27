@@ -74,6 +74,29 @@ class CleanMigrationStartupTest {
     }
 
     @Test
+    void receiptsAndRecentPicksAreScopedAndExcludeVoids() {
+        var buyer = registration.registerMember(-212L, "Receipt", 84L, "Buyer", null);
+        var outsider = registration.registerMember(-213L, "Other", 84L, "Other", null);
+        var draft = PurchaseDraft.EMPTY.sharing(true, null).attach(new PurchaseDraft.Photo("fake_file", "image/jpeg", 42));
+        long id = 0;
+        int key = 0;
+        for (String item : java.util.List.of("нан", "сүт", "күріш", "сабын", "шай", "Нан", "өшкен")) {
+            id = purchases.confirm(buyer, "%032x".formatted(++key),
+                    draft.input(null, item, null).price(new BigDecimal("12.34"))).id();
+        }
+        jdbc.update("UPDATE purchase SET status = 'VOID' WHERE id = ?", id);
+        assertThat(purchases.recent(buyer)).extracting(PurchaseService.RecentProduct::label)
+                .containsExactly("Нан", "шай", "сабын", "күріш", "сүт");
+        var receipt = purchases.receipt(buyer, id).orElseThrow();
+        assertThat(receipt.total()).isEqualByComparingTo("12.34");
+        assertThat(receipt.buyer()).isEqualTo("Buyer");
+        assertThat(receipt.photo().fileId()).isEqualTo("fake_file");
+        assertThat(receipt.lines()).extracting(PurchaseDraft.Line::label).containsExactly("өшкен");
+        assertThat(purchases.receipt(outsider, id)).isEmpty();
+        assertThat(purchases.recent(outsider)).isEmpty();
+    }
+
+    @Test
     void springStartsWithFlywayThenHibernateValidation() {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM \"flyway_schema_history\" WHERE \"version\" = '1' AND \"success\" = TRUE", Integer.class))
                 .isEqualTo(1);

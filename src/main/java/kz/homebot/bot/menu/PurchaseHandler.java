@@ -23,11 +23,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Comparator;
 
 @Component
 public class PurchaseHandler implements CallbackRouter.Handler, InteractionReplyRouter.Handler,
         MainMenuHandler.Destination, CatalogMenu.Selection {
     private static final String KIND = "purchase";
+    private static final String RECEIPTS = "receipts";
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
             .withZone(ZoneId.of("Asia/Almaty"));
 
@@ -77,8 +79,11 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
     @Override
     public void choose(String action, CallbackRouter.Call call) {
         boolean custom = "custom".equals(action);
-        String key = custom ? null : action.substring(2);
-        if (!custom && !products.contains(key)) {
+        var recent = action.startsWith("p:r:") ? purchases.recent(call.member()).stream()
+                .filter(item -> action.equals("p:r:" + Long.toString(item.id(), 36))).findFirst().orElse(null) : null;
+        String key = recent != null ? recent.catalogKey() : custom ? null : action.substring(2);
+        String selectedName = recent != null ? recent.label() : custom ? null : messages.getMessage("catalog.product." + key);
+        if (!custom && recent == null && !products.contains(key)) {
             call.output().send(call.message().getChatId(), messages.getMessage("purchase.missing"), null);
             return;
         }
@@ -87,14 +92,24 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
             if (draft.lines().size() >= PurchaseDraft.MAX_LINES) {
                 return new Change(sessions.advance(row, "basket", write(draft), false), "purchase.lineLimit");
             }
-            var input = draft.input(key, custom ? null : messages.getMessage("catalog.product." + key), null);
+            var input = draft.input(key, selectedName, null);
             return new Change(sessions.advance(row, custom ? "name" : "price", write(input), false), null);
         });
         render(change.session(), call.member(), call.output(), change.error());
     }
 
     @Override
+    public List<CatalogMenu.RecentProduct> recent(CallbackRouter.Call call) {
+        return purchases.recent(call.member()).stream().map(item ->
+                new CatalogMenu.RecentProduct("r:" + Long.toString(item.id(), 36), "menu.value", item.label())).toList();
+    }
+
+    @Override
     public void handle(CallbackRouter.Call call) {
+        if (call.data().contains(":h:") || call.data().contains(":r:") || call.data().contains(":showPhoto")) {
+            receiptButton(call);
+            return;
+        }
         boolean confirm = call.data().endsWith(":confirm");
         var result = confirm ? sessions.withConfirmation(call, KIND, (row, action) -> confirm(row, call.member()))
                 : sessions.withButton(call, KIND, (row, action) -> button(row, action, call.member()));
@@ -106,8 +121,9 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         var change = result.get();
         var row = change.session();
         if (change.receiptId() != null) {
-            views.withMainButton(call.member(), row.chatId(),
-                    messages.getMessage("purchase.confirmed", change.receiptId().toString()), call.output());
+            showReceipt(call, change.receiptId(), false);
+        } else if ("receiptHistory".equals(row.state())) {
+            showHistory(call, 0);
         } else if ("catalog".equals(row.state())) {
             catalog.open("catalog", call);
         } else {
@@ -146,12 +162,14 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         if ("back".equals(action) || "cancelNo".equals(action) && "cancel".equals(state)) {
             return next(row, "basket", draft.input(null, null, null));
         }
-        if ("retry".equals(action) && List.of("name", "price", "editPrice").contains(state)) {
+        if ("retry".equals(action) && List.of("name", "price", "editPrice", "photo").contains(state)) {
             return next(row, state, draft);
         }
         if ("basket".equals(state)) {
             return switch (action) {
                 case "add" -> next(row, "catalog", draft);
+                case "history" -> next(row, "receiptHistory", draft);
+                case "photo" -> next(row, "photo", draft);
                 case "edit", "remove" -> next(row, action, draft);
                 case "participants" -> draft.personal() ? null : next(row, action, draft.input(null, null, 0));
                 case "sharing" -> next(row, "basket", draft.sharing(!draft.personal(), draft.participantIds()));
@@ -193,7 +211,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
 
     @Override
     public void reply(InteractionSession expected, Member member, Message message, TelegramOutput output) {
-        var change = sessions.withReply(expected, row -> reply(row, message.getText()));
+        var change = sessions.withReply(expected, row -> reply(row, message));
         if (change.isEmpty()) {
             output.send(message.getChatId(), messages.getMessage("v2.promptExpired"), null);
         } else if (change.get().error() != null) {
@@ -203,8 +221,13 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         }
     }
 
-    private Change reply(InteractionSession row, String text) {
+    private Change reply(InteractionSession row, Message message) {
         var draft = read(row);
+        String text = message.getText();
+        if ("photo".equals(row.state())) {
+            var photo = toPhoto(message);
+            return photo == null ? new Change(row, "purchase.invalidPhoto") : next(row, "basket", draft.attach(photo));
+        }
         if ("name".equals(row.state())) {
             String name = text == null ? "" : text.strip();
             if (name.isEmpty() || name.codePointCount(0, name.length()) > 60 || name.chars().anyMatch(Character::isISOControl)) {
@@ -240,6 +263,11 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         String text;
         String prompt = null;
         switch (row.state()) {
+            case "photo" -> {
+                text = messages.getMessage("purchase.photo");
+                prompt = messages.getMessage("purchase.enterPhoto");
+                buttons.add(new MenuViews.Button("v2.retry", "retry"));
+            }
             case "name", "price", "editPrice" -> {
                 text = messages.getMessage("menu.basket");
                 prompt = "name".equals(row.state()) ? messages.getMessage("purchase.enterName")
@@ -291,6 +319,8 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                     buttons.add(new MenuViews.Button("purchase.participants", "participants"));
                 }
                 buttons.add(new MenuViews.Button("purchase.sharing", "sharing"));
+                buttons.add(new MenuViews.Button("purchase.photo", "photo"));
+                buttons.add(new MenuViews.Button("purchase.history", "history"));
                 buttons.add(new MenuViews.Button("menu.confirm", "confirm"));
             }
         }
@@ -321,9 +351,101 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         return text.append("\n").append(messages.getMessage("purchase.total", money.format(draft.total())))
                 .append("\n").append(messages.getMessage("purchase.buyer", member.getDisplayName(), TIME.format(row.expiresAt().minusSeconds(1800))))
                 .append("\n").append(messages.getMessage(draft.personal() ? "purchase.personal" : "purchase.shared"))
+                .append(draft.photo() == null ? "" : "\n" + messages.getMessage("purchase.photoAttached"))
                 .append(draft.personal() ? "" : "\n" + messages.getMessage("purchase.members",
                         String.join(", ", purchases.participants(member, draft).stream().map(Member::getDisplayName).toList())))
                 .toString();
+    }
+
+    private void receiptButton(CallbackRouter.Call call) {
+        var result = sessions.withButton(call, RECEIPTS, (row, action) -> {
+            boolean page = action.matches("h:[0-9]{1,6}");
+            boolean receipt = "history".equals(row.state()) && action.matches("r:[0-9a-z]{1,13}");
+            boolean photo = "receipt".equals(row.state()) && "showPhoto".equals(action);
+            if (!page && !receipt && !photo && !"h:home".equals(action)) {
+                return null;
+            }
+            sessions.advance(row, "closed", "{}", true);
+            return "showPhoto".equals(action) ? "photo:" + row.payload() : action;
+        });
+        if (result.isEmpty()) {
+            call.answer().send(messages.getMessage("v2.stale"));
+            return;
+        }
+        call.answer().send(null);
+        String action = result.get();
+        if ("h:home".equals(action)) {
+            views.main(call.member(), call.message().getChatId(), messages.getMessage("menu.title"), call.output());
+        } else if (action.startsWith("h:")) {
+            showHistory(call, Integer.parseInt(action.substring(2)));
+        } else if (action.startsWith("r:")) {
+            showReceipt(call, Long.parseLong(action.substring(2), 36), false);
+        } else {
+            showReceipt(call, Long.parseLong(action.substring(6)), true);
+        }
+    }
+
+    private void showHistory(CallbackRouter.Call call, int page) {
+        var history = purchases.history(call.member(), page);
+        var buttons = new ArrayList<MenuViews.Button>();
+        history.stream().limit(8).forEach(receipt -> buttons.add(new MenuViews.Button("purchase.historyRow",
+                "r:" + Long.toString(receipt.id(), 36), String.valueOf(receipt.id()), money.format(receipt.total()),
+                "VOID".equals(receipt.status()) ? messages.getMessage("purchase.void") : "")));
+        if (page > 0) {
+            buttons.add(new MenuViews.Button("catalog.previous", "h:" + (page - 1)));
+        }
+        if (history.size() > 8) {
+            buttons.add(new MenuViews.Button("catalog.next", "h:" + (page + 1)));
+        }
+        buttons.add(new MenuViews.Button("menu.home", "h:home"));
+        var row = sessions.navigate(call.member(), call.message().getChatId(), RECEIPTS, "history", "{}");
+        views.send(row, kind(), messages.getMessage("purchase.history") + (history.isEmpty()
+                ? "\n" + messages.getMessage("v2.empty") : ""), buttons, call.output());
+    }
+
+    private void showReceipt(CallbackRouter.Call call, long id, boolean showPhoto) {
+        var receipt = purchases.receipt(call.member(), id).orElse(null);
+        if (receipt == null) {
+            call.output().send(call.message().getChatId(), messages.getMessage("v2.empty"), null);
+            return;
+        }
+        String number = String.valueOf(id);
+        var text = new StringBuilder(messages.getMessage("purchase.confirmed", number));
+        for (var line : receipt.lines()) {
+            text.append("\n").append(line.label()).append(" — ").append(money.format(line.price()));
+        }
+        text.append("\n").append(messages.getMessage("purchase.total", money.format(receipt.total())))
+                .append("\n").append(messages.getMessage("purchase.buyer", receipt.buyer(), TIME.format(receipt.time())))
+                .append("\n").append(messages.getMessage(receipt.shared() ? "purchase.shared" : "purchase.personal"));
+        if ("VOID".equals(receipt.status())) {
+            text.append("\n").append(messages.getMessage("purchase.void"));
+        }
+        if (receipt.shared()) {
+            text.append("\n").append(messages.getMessage("purchase.members", String.join(", ", receipt.participants())))
+                    .append("\n").append(messages.getMessage("purchase.expenseId", receipt.expenseId().toString()));
+        }
+        var buttons = new ArrayList<MenuViews.Button>();
+        if (receipt.photo() != null) {
+            buttons.add(new MenuViews.Button("purchase.photo", "showPhoto"));
+            if (showPhoto && !call.output().photo(call.message().getChatId(), receipt.photo().fileId(),
+                    messages.getMessage("purchase.confirmed", number))) {
+                text.append("\n").append(messages.getMessage("v2.retry"));
+            }
+        }
+        buttons.add(new MenuViews.Button("purchase.history", "h:0"));
+        buttons.add(new MenuViews.Button("menu.home", "h:home"));
+        var row = sessions.navigate(call.member(), call.message().getChatId(), RECEIPTS, "receipt", number);
+        views.send(row, kind(), text.toString(), buttons, call.output());
+    }
+
+    static PurchaseDraft.Photo toPhoto(Message message) {
+        if (!message.hasPhoto() || message.getDocument() != null) {
+            return null;
+        }
+        return message.getPhoto().stream().filter(size -> size.getFileSize() != null)
+                .max(Comparator.comparingInt(size -> size.getFileSize()))
+                .map(size -> new PurchaseDraft.Photo(size.getFileId(), "image/jpeg", size.getFileSize()))
+                .filter(PurchaseDraft.Photo::valid).orElse(null);
     }
 
     private String capitalize(String label) {

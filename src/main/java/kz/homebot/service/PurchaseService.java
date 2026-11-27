@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class PurchaseService {
@@ -45,7 +46,8 @@ public class PurchaseService {
             return existing.getFirst();
         }
         if (key == null || !key.matches("[0-9a-f]{32}") || draft.lines().isEmpty() || draft.lines().size() > PurchaseDraft.MAX_LINES
-                || draft.lines().stream().anyMatch(line -> !valid(line)) || draft.total().compareTo(Limits.MAX_AMOUNT) > 0) {
+                || draft.lines().stream().anyMatch(line -> !valid(line)) || draft.total().compareTo(Limits.MAX_AMOUNT) > 0
+                || draft.photo() != null && !draft.photo().valid()) {
             throw new IllegalArgumentException("Invalid purchase");
         }
         var participants = participants(buyer, draft);
@@ -57,7 +59,8 @@ public class PurchaseService {
         jdbc.update(connection -> {
             var statement = connection.prepareStatement("""
                     INSERT INTO purchase(household_id, buyer_member_id, status, shared, total, purchased_at,
-                        created_at, confirmed_at, expense_id, confirmation_key) VALUES (?, ?, 'CONFIRMED', ?, ?, ?, ?, ?, ?, ?)
+                        created_at, confirmed_at, expense_id, confirmation_key, receipt_file_id, receipt_mime,
+                        receipt_bytes) VALUES (?, ?, 'CONFIRMED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, household);
             statement.setLong(2, buyer.getId());
@@ -68,6 +71,10 @@ public class PurchaseService {
             statement.setTimestamp(7, now);
             statement.setObject(8, expenseId);
             statement.setString(9, key);
+            var photo = draft.photo();
+            statement.setString(10, photo == null ? null : photo.fileId());
+            statement.setString(11, photo == null ? null : photo.mime());
+            statement.setObject(12, photo == null ? null : photo.bytes());
             return statement;
         }, generated);
         long receiptId = generated.getKey().longValue();
@@ -89,6 +96,65 @@ public class PurchaseService {
     }
 
     public record Receipt(long id, Long expenseId) {}
+
+    @Transactional(readOnly = true)
+    public Optional<ReceiptDetail> receipt(Member viewer, long id) {
+        long home = viewer.getHousehold().getId();
+        requireViewer(viewer);
+        return jdbc.query("""
+                SELECT p.*, m.display_name AS buyer_name FROM purchase p JOIN member m ON m.id = p.buyer_member_id
+                WHERE p.id = ? AND p.household_id = ?
+                """, (row, number) -> {
+            String file = row.getString("receipt_file_id");
+            return new ReceiptDetail(id, row.getLong("buyer_member_id"), row.getString("buyer_name"),
+                    row.getString("status"), row.getBoolean("shared"), row.getBigDecimal("total"),
+                    row.getTimestamp("purchased_at").toInstant(), row.getObject("expense_id", Long.class),
+                    file == null ? null : new PurchaseDraft.Photo(file, row.getString("receipt_mime"), row.getLong("receipt_bytes")),
+                    List.of(), List.of());
+        }, id, home).stream().findFirst().map(receipt -> {
+            var lines = jdbc.query("SELECT catalog_key, label, price FROM purchase_item WHERE purchase_id = ? ORDER BY position",
+                    (row, number) -> new PurchaseDraft.Line(row.getString(1), row.getString(2), row.getBigDecimal(3)), id);
+            var participants = jdbc.queryForList("""
+                    SELECT m.display_name FROM purchase_participant part JOIN member m ON m.id = part.member_id
+                    WHERE part.purchase_id = ? AND m.household_id = ? ORDER BY m.id
+                    """, String.class, id, home);
+            return new ReceiptDetail(receipt.id(), receipt.buyerId(), receipt.buyer(), receipt.status(), receipt.shared(),
+                    receipt.total(), receipt.time(), receipt.expenseId(), receipt.photo(), lines, participants);
+        });
+    }
+
+    public List<ReceiptSummary> history(Member viewer, int page) {
+        requireViewer(viewer);
+        return jdbc.query("""
+                SELECT id, total, status FROM purchase WHERE household_id = ? ORDER BY id DESC LIMIT 9 OFFSET ?
+                """, (row, number) -> new ReceiptSummary(row.getLong(1), row.getBigDecimal(2), row.getString(3)),
+                viewer.getHousehold().getId(), page * 8L);
+    }
+
+    public List<RecentProduct> recent(Member viewer) {
+        requireViewer(viewer);
+        return jdbc.query("""
+                SELECT id, catalog_key, label FROM (
+                    SELECT i.id, i.catalog_key, i.label, p.id AS purchase_order, i.position,
+                           ROW_NUMBER() OVER (PARTITION BY COALESCE(i.catalog_key, 'custom:' || LOWER(i.label))
+                                              ORDER BY p.id DESC, i.position DESC) AS label_rank
+                    FROM purchase_item i JOIN purchase p ON p.id = i.purchase_id
+                    WHERE p.household_id = ? AND p.status = 'CONFIRMED'
+                ) products WHERE label_rank = 1 ORDER BY purchase_order DESC, position DESC LIMIT 5
+                """, (row, number) -> new RecentProduct(row.getLong(1), row.getString(2), row.getString(3)), viewer.getHousehold().getId());
+    }
+
+    private void requireViewer(Member viewer) {
+        jdbc.queryForObject("""
+                SELECT id FROM member WHERE household_id = ? AND id = ? AND telegram_user_id = ?
+                """, Long.class, viewer.getHousehold().getId(), viewer.getId(), viewer.getTelegramUserId());
+    }
+
+    public record ReceiptDetail(long id, long buyerId, String buyer, String status, boolean shared,
+                                java.math.BigDecimal total, Instant time, Long expenseId, PurchaseDraft.Photo photo,
+                                List<PurchaseDraft.Line> lines, List<String> participants) {}
+    public record ReceiptSummary(long id, java.math.BigDecimal total, String status) {}
+    public record RecentProduct(long id, String catalogKey, String label) {}
 
     public List<Member> householdMembers(Member buyer) {
         return members.findByHousehold(buyer.getHousehold()).stream().sorted(Comparator.comparing(Member::getId)).toList();

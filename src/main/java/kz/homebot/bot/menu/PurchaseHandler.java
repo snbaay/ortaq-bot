@@ -13,6 +13,7 @@ import kz.homebot.service.MessageService;
 import kz.homebot.service.MoneyFormatter;
 import kz.homebot.service.ProductCatalog;
 import kz.homebot.service.PurchaseDraft;
+import kz.homebot.service.PurchaseService;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ForceReplyKeyboard;
@@ -34,16 +35,18 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
     private final MenuViews views;
     private final CatalogMenu catalog;
     private final ProductCatalog products;
+    private final PurchaseService purchases;
     private final MessageService messages;
     private final MoneyFormatter money;
     private final ObjectMapper json;
 
     public PurchaseHandler(SessionStore sessions, MenuViews views, CatalogMenu catalog, ProductCatalog products,
-                           MessageService messages, MoneyFormatter money, ObjectMapper json) {
+                           PurchaseService purchases, MessageService messages, MoneyFormatter money, ObjectMapper json) {
         this.sessions = sessions;
         this.views = views;
         this.catalog = catalog;
         this.products = products;
+        this.purchases = purchases;
         this.messages = messages;
         this.money = money;
         this.json = json;
@@ -92,7 +95,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
 
     @Override
     public void handle(CallbackRouter.Call call) {
-        var result = sessions.withButton(call, KIND, this::button);
+        var result = sessions.withButton(call, KIND, (row, action) -> button(row, action, call.member()));
         if (result.isEmpty()) {
             call.answer().send(messages.getMessage("v2.stale"));
             return;
@@ -107,7 +110,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         }
     }
 
-    private Change button(InteractionSession row, String action) {
+    private Change button(InteractionSession row, String action, Member buyer) {
         var draft = read(row);
         String state = row.state();
         if ("home".equals(action)) {
@@ -129,10 +132,30 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
             return switch (action) {
                 case "add" -> next(row, "catalog", draft);
                 case "edit", "remove" -> next(row, action, draft);
+                case "participants" -> draft.personal() ? null : next(row, action, draft.input(null, null, 0));
+                case "sharing" -> next(row, "basket", draft.sharing(!draft.personal(), draft.participantIds()));
                 case "confirm" -> draft.lines().isEmpty() ? new Change(
                         sessions.advance(row, "basket", write(draft), false), "purchase.empty") : null;
                 default -> null;
             };
+        }
+        if ("participants".equals(state)) {
+            if (action.matches("t:[0-9a-z]{1,12}")) {
+                try {
+                    return next(row, state, purchases.toggleParticipant(buyer, draft, Long.parseLong(action.substring(2), 36)));
+                } catch (IllegalArgumentException denied) {
+                    return new Change(sessions.advance(row, state, write(draft), false), "v2.denied");
+                }
+            }
+            if ("all".equals(action)) {
+                return next(row, state, draft.sharing(false, null));
+            }
+            if (action.matches("page:[0-9]{1,5}")) {
+                int page = Integer.parseInt(action.substring(5));
+                if (page * 8 < purchases.householdMembers(buyer).size()) {
+                    return next(row, state, draft.input(null, null, page));
+                }
+            }
         }
         if (action.matches("i:[0-9]{1,2}") && List.of("edit", "remove").contains(state)) {
             int index = Integer.parseInt(action.substring(2));
@@ -203,6 +226,25 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                         : messages.getMessage("purchase.enterPrice", capitalize(draft.label()));
                 buttons.add(new MenuViews.Button("v2.retry", "retry"));
             }
+            case "participants" -> {
+                text = messages.getMessage("purchase.participants");
+                var selected = purchases.participants(member, draft).stream().map(Member::getId).toList();
+                var all = purchases.householdMembers(member);
+                int page = draft.index();
+                int end = Math.min(all.size(), (page + 1) * 8);
+                for (int i = page * 8; i < end; i++) {
+                    Member candidate = all.get(i);
+                    String key = selected.contains(candidate.getId()) ? "purchase.selected" : "menu.value";
+                    buttons.add(new MenuViews.Button(key, "t:" + Long.toString(candidate.getId(), 36), candidate.getDisplayName()));
+                }
+                buttons.add(new MenuViews.Button("purchase.all", "all"));
+                if (page > 0) {
+                    buttons.add(new MenuViews.Button("catalog.previous", "page:" + (page - 1)));
+                }
+                if (end < all.size()) {
+                    buttons.add(new MenuViews.Button("catalog.next", "page:" + (page + 1)));
+                }
+            }
             case "edit", "remove" -> {
                 text = messages.getMessage("purchase.selectLine");
                 for (int index = 0; index < draft.lines().size(); index++) {
@@ -225,6 +267,10 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                     buttons.add(new MenuViews.Button("purchase.edit", "edit"));
                     buttons.add(new MenuViews.Button("purchase.remove", "remove"));
                 }
+                if (!draft.personal()) {
+                    buttons.add(new MenuViews.Button("purchase.participants", "participants"));
+                }
+                buttons.add(new MenuViews.Button("purchase.sharing", "sharing"));
                 buttons.add(new MenuViews.Button("menu.confirm", "confirm"));
             }
         }
@@ -254,6 +300,9 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         }
         return text.append("\n").append(messages.getMessage("purchase.total", money.format(draft.total())))
                 .append("\n").append(messages.getMessage("purchase.buyer", member.getDisplayName(), TIME.format(row.expiresAt().minusSeconds(1800))))
+                .append("\n").append(messages.getMessage(draft.personal() ? "purchase.personal" : "purchase.shared"))
+                .append(draft.personal() ? "" : "\n" + messages.getMessage("purchase.members",
+                        String.join(", ", purchases.participants(member, draft).stream().map(Member::getDisplayName).toList())))
                 .toString();
     }
 

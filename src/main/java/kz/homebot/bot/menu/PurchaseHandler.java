@@ -95,7 +95,9 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
 
     @Override
     public void handle(CallbackRouter.Call call) {
-        var result = sessions.withButton(call, KIND, (row, action) -> button(row, action, call.member()));
+        boolean confirm = call.data().endsWith(":confirm");
+        var result = confirm ? sessions.withConfirmation(call, KIND, (row, action) -> confirm(row, call.member()))
+                : sessions.withButton(call, KIND, (row, action) -> button(row, action, call.member()));
         if (result.isEmpty()) {
             call.answer().send(messages.getMessage("v2.stale"));
             return;
@@ -103,11 +105,30 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         call.answer().send(null);
         var change = result.get();
         var row = change.session();
-        if ("catalog".equals(row.state())) {
+        if (change.receiptId() != null) {
+            views.withMainButton(call.member(), row.chatId(),
+                    messages.getMessage("purchase.confirmed", change.receiptId().toString()), call.output());
+        } else if ("catalog".equals(row.state())) {
             catalog.open("catalog", call);
         } else {
             render(row, call.member(), call.output(), change.error());
         }
+    }
+
+    private Change confirm(InteractionSession row, Member buyer) {
+        if ("confirmed".equals(row.state())) {
+            return new Change(row, null, Long.valueOf(row.payload()));
+        }
+        if (!"basket".equals(row.state())) {
+            return null;
+        }
+        var draft = read(row);
+        if (draft.lines().isEmpty()) {
+            return new Change(sessions.advance(row, "basket", write(draft), false), "purchase.empty");
+        }
+        var receipt = purchases.confirm(buyer, row.id(), draft);
+        sessions.finish(row, String.valueOf(receipt.id()));
+        return new Change(row, null, receipt.id());
     }
 
     private Change button(InteractionSession row, String action, Member buyer) {
@@ -134,8 +155,7 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
                 case "edit", "remove" -> next(row, action, draft);
                 case "participants" -> draft.personal() ? null : next(row, action, draft.input(null, null, 0));
                 case "sharing" -> next(row, "basket", draft.sharing(!draft.personal(), draft.participantIds()));
-                case "confirm" -> draft.lines().isEmpty() ? new Change(
-                        sessions.advance(row, "basket", write(draft), false), "purchase.empty") : null;
+
                 default -> null;
             };
         }
@@ -326,5 +346,9 @@ public class PurchaseHandler implements CallbackRouter.Handler, InteractionReply
         }
     }
 
-    private record Change(InteractionSession session, String error) {}
+    private record Change(InteractionSession session, String error, Long receiptId) {
+        Change(InteractionSession session, String error) {
+            this(session, error, null);
+        }
+    }
 }

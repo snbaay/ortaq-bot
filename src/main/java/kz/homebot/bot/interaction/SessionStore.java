@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -28,6 +29,7 @@ public class SessionStore {
             instant(rs.getTimestamp("expires_at")), instant(rs.getTimestamp("closed_at")));
 
     private final JdbcTemplate jdbc;
+    private final AtomicLong nextCleanup = new AtomicLong();
 
     public SessionStore(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -38,6 +40,7 @@ public class SessionStore {
         long household = member.getHousehold().getId();
         long user = member.getTelegramUserId();
         Instant now = Instant.now();
+        cleanup(now);
         // Serialize creation even if there is no existing row to lock.
         jdbc.queryForObject("SELECT id FROM household WHERE id = ? AND telegram_chat_id = ? FOR UPDATE",
                 Long.class, household, chat);
@@ -49,36 +52,57 @@ public class SessionStore {
 
     @Transactional
     public InteractionSession shared(Member member, long chat, String kind, String state) {
-        return insert(member.getHousehold().getId(), null, chat, kind, state, "{}", Instant.now());
+        Instant now = Instant.now();
+        cleanup(now);
+        long household = member.getHousehold().getId();
+        if (!isMember(household, member.getTelegramUserId())
+                || jdbc.queryForObject("SELECT telegram_chat_id FROM household WHERE id = ?", Long.class, household) != chat) {
+            throw new IllegalArgumentException("Unknown household chat or member");
+        }
+        return insert(household, null, chat, kind, state, "{}", now);
     }
 
     @Transactional
-    public InteractionSession newMenu(Member member, long chat, String state) {
-        var session = open(member, chat, "menu", state, "{}");
-        return advance(session, state, "{}", false);
+    public InteractionSession navigate(Member member, long chat, String kind, String state, String payload) {
+        var session = open(member, chat, kind, state, payload);
+        return advance(session, state, payload, false);
     }
 
     public boolean bindMenu(InteractionSession session, int messageId) {
         return jdbc.update("""
                 UPDATE interaction_session SET menu_message_id = ? WHERE id = ? AND version = ?
-                AND closed_at IS NULL AND expires_at > ?
+                AND menu_message_id IS NULL AND closed_at IS NULL AND expires_at > ?
                 """, messageId, session.id(), session.version(), Timestamp.from(Instant.now())) == 1;
     }
 
     @Transactional
     public <T> Optional<T> withButton(CallbackRouter.Call call, String kind,
                                       BiFunction<InteractionSession, String, T> action) {
+        return validateButton(call, kind, false, action);
+    }
+
+    @Transactional
+    public <T> Optional<T> withConfirmation(CallbackRouter.Call call, String kind,
+                                            BiFunction<InteractionSession, String, T> action) {
+        return validateButton(call, kind, true, action);
+    }
+
+    private <T> Optional<T> validateButton(CallbackRouter.Call call, String kind, boolean allowReplay,
+                                           BiFunction<InteractionSession, String, T> action) {
         String[] fields = call.data().split(":", 3);
         if (fields.length != 3 || !fields[0].matches("[0-9a-f]{32}") || !fields[1].matches("[0-9a-z]{1,6}")) {
             return Optional.empty();
         }
         long user = call.member().getTelegramUserId();
-        return lock(fields[0]).filter(row -> row.kind().equals(kind) && row.activeAt(Instant.now())
+        Instant now = Instant.now();
+        return lock(fields[0]).filter(row -> row.kind().equals(kind) && row.expiresAt().isAfter(now)
                 && row.chatId() == call.message().getChatId()
                 && row.householdId() == call.member().getHousehold().getId()
                 && row.menuId() != null && row.menuId().equals(call.message().getMessageId())
-                && Integer.toString(row.version(), 36).equals(fields[1])
-                && (row.userId() == null || row.userId() == user)
+                && (row.activeAt(now) && Integer.toString(row.version(), 36).equals(fields[1])
+                    || allowReplay && row.closedAt() != null && "confirmed".equals(row.state())
+                    && "confirm".equals(fields[2]) && Integer.toString(row.version() - 1, 36).equals(fields[1]))
+                && (row.userId() == null ? !allowReplay : row.userId() == user)
                 && isMember(row.householdId(), user)).map(row -> action.apply(row, fields[2]));
     }
 
@@ -112,7 +136,7 @@ public class SessionStore {
         Instant now = Instant.now();
         return jdbc.update("""
                 UPDATE interaction_session SET prompt_message_id = ?, prompt_expires_at = ?
-                WHERE id = ? AND version = ? AND closed_at IS NULL AND expires_at > ?
+                WHERE id = ? AND version = ? AND prompt_message_id IS NULL AND closed_at IS NULL AND expires_at > ?
                 """, messageId, Timestamp.from(now.plus(PROMPT_LIFETIME)), session.id(), session.version(),
                 Timestamp.from(now)) == 1;
     }
@@ -138,6 +162,25 @@ public class SessionStore {
         }
         return new InteractionSession(previous.id(), previous.householdId(), previous.userId(), previous.chatId(),
                 previous.kind(), state, payload, null, null, null, previous.version() + 1, previous.expiresAt(), closed);
+    }
+
+    public void finish(InteractionSession previous, String result) {
+        int updated = jdbc.update("""
+                UPDATE interaction_session SET state = 'confirmed', payload_json = ?, version = version + 1,
+                prompt_message_id = NULL, prompt_expires_at = NULL, closed_at = ?
+                WHERE id = ? AND version = ? AND closed_at IS NULL AND telegram_user_id IS NOT NULL
+                """, result, Timestamp.from(Instant.now()), previous.id(), previous.version());
+        if (updated != 1) {
+            throw new IllegalStateException("Session already finished");
+        }
+    }
+
+    private void cleanup(Instant now) {
+        long scheduled = nextCleanup.get();
+        if (now.getEpochSecond() >= scheduled
+                && nextCleanup.compareAndSet(scheduled, now.plus(Duration.ofDays(1)).getEpochSecond())) {
+            jdbc.update("DELETE FROM interaction_session WHERE expires_at < ?", Timestamp.from(now.minus(Duration.ofDays(7))));
+        }
     }
 
     protected Optional<InteractionSession> lock(String id) {

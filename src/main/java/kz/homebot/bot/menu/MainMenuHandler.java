@@ -105,8 +105,8 @@ public class MainMenuHandler implements CallbackRouter.Handler {
         }
     }
 
-    private void submenu(CallbackRouter.Call call, String name, String text) {
-        var session = sessions.newMenu(call.member(), call.message().getChatId(), name);
+    void submenu(CallbackRouter.Call call, String name, String text) {
+        var session = sessions.navigate(call.member(), call.message().getChatId(), "menu", name, "{}");
         List<MenuViews.Button> buttons = new ArrayList<>();
         MENUS.get(name).forEach(item -> buttons.add(new MenuViews.Button("menu." + item, item)));
         buttons.add(new MenuViews.Button("menu.back", "back"));

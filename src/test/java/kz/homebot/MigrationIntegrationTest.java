@@ -31,6 +31,7 @@ class MigrationIntegrationTest {
 
     @Test
     void existingPreV2SchemaIsBaselinedWithoutChangingLedgerOrCookingRows() {
+
         legacyJdbc.update("INSERT INTO household(id, telegram_chat_id, title, created_at) VALUES (10, -123, 'Home', CURRENT_TIMESTAMP)");
         legacyJdbc.update("INSERT INTO member(id, household_id, telegram_user_id, display_name, created_at) VALUES (11, 10, 101, 'A', CURRENT_TIMESTAMP), (12, 10, 102, 'B', CURRENT_TIMESTAMP), (13, 10, 103, 'C', CURRENT_TIMESTAMP)");
         legacyJdbc.update("INSERT INTO expense(id, household_id, payer_id, amount, description, created_at, deleted, settlement) VALUES (21, 10, 11, 90.00, 'Food', CURRENT_TIMESTAMP, FALSE, FALSE), (22, 10, 12, 30.00, 'Paid back', CURRENT_TIMESTAMP, FALSE, TRUE)");
@@ -89,14 +90,14 @@ class MigrationIntegrationTest {
         jdbc.update("INSERT INTO household(id, telegram_chat_id, title, created_at) VALUES (1, -100, 'Test', CURRENT_TIMESTAMP)");
         jdbc.update("INSERT INTO member(id, household_id, telegram_user_id, display_name, created_at) VALUES (1, 1, 100, 'Tester', CURRENT_TIMESTAMP)");
         jdbc.update("INSERT INTO expense(id, household_id, payer_id, amount, description, created_at, deleted, settlement) VALUES (1, 1, 1, 42.00, 'Test', CURRENT_TIMESTAMP, FALSE, FALSE)");
-        Files.writeString(tempDir.resolve("V2__intentional_failure.sql"),
+        Files.writeString(tempDir.resolve("V9999__intentional_failure.sql"),
                 "UPDATE expense SET amount = 999.00 WHERE id = 1;\nINSERT INTO missing_table VALUES (1);\n");
         var broken = Flyway.configure().dataSource(dataSource)
                 .locations("classpath:db/migration", "filesystem:" + tempDir)
                 .baselineVersion("1").cleanDisabled(true).load();
         assertThatThrownBy(broken::migrate).isInstanceOf(Exception.class);
         assertThat(jdbc.queryForObject("SELECT amount FROM expense WHERE id = 1", java.math.BigDecimal.class)).isEqualByComparingTo("42.00");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM \"flyway_schema_history\" WHERE \"version\" = '2' AND \"success\" = TRUE", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM \"flyway_schema_history\" WHERE \"version\" = '9999' AND \"success\" = TRUE", Integer.class)).isZero();
     }
 
     private static List<String> balances(JdbcTemplate jdbc) {

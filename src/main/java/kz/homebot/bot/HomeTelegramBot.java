@@ -1,5 +1,7 @@
 package kz.homebot.bot;
 
+import kz.homebot.bot.callback.CallbackRouter;
+import kz.homebot.bot.callback.ProcessedUpdates;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.config.AllowedChats;
 import kz.homebot.service.MessageService;
@@ -13,7 +15,7 @@ import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsume
 import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.chat.Chat;
@@ -39,7 +41,9 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     private final MemberRegistrationService memberRegistrationService;
     private final CommandParser commandParser;
     private final CommandRouter commandRouter;
-    private final ExpenseHandler expenseHandler;
+    private final TelegramOutput output;
+    private final CallbackRouter callbacks;
+    private final ProcessedUpdates updates;
     private final AllowedChats allowedChats;
 
     @Autowired
@@ -50,17 +54,9 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             MemberRegistrationService memberRegistrationService,
             CommandParser commandParser,
             CommandRouter commandRouter,
-            ExpenseHandler expenseHandler,
-            AllowedChats allowedChats) {
-        this.botToken = botToken;
-        this.botUsername = botUsername;
-        this.messageService = messageService;
-        this.memberRegistrationService = memberRegistrationService;
-        this.commandParser = commandParser;
-        this.commandRouter = commandRouter;
-        this.expenseHandler = expenseHandler;
-        this.allowedChats = allowedChats;
-        this.telegramClient = new OkHttpTelegramClient(botToken);
+            AllowedChats allowedChats, CallbackRouter callbacks, ProcessedUpdates updates) {
+        this(botToken, botUsername, messageService, memberRegistrationService, commandParser, commandRouter,
+                new OkHttpTelegramClient(botToken), allowedChats, callbacks, updates);
     }
 
     // Secondary constructor for testing (inject TelegramClient directly)
@@ -81,15 +77,25 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                            MemberRegistrationService memberRegistrationService, CommandParser commandParser,
                            CommandRouter commandRouter, ExpenseHandler expenseHandler,
                            TelegramClient telegramClient, AllowedChats allowedChats) {
+        this(botToken, botUsername, messageService, memberRegistrationService, commandParser, commandRouter,
+                telegramClient, allowedChats, null, null);
+    }
+
+    public HomeTelegramBot(String botToken, String botUsername, MessageService messageService,
+                           MemberRegistrationService memberRegistrationService, CommandParser commandParser,
+                           CommandRouter commandRouter, TelegramClient telegramClient, AllowedChats allowedChats,
+                           CallbackRouter callbacks, ProcessedUpdates updates) {
         this.botToken = botToken;
         this.botUsername = botUsername;
         this.messageService = messageService;
         this.memberRegistrationService = memberRegistrationService;
         this.commandParser = commandParser;
         this.commandRouter = commandRouter;
-        this.expenseHandler = expenseHandler;
         this.allowedChats = allowedChats;
         this.telegramClient = telegramClient;
+        this.output = new TelegramOutput(telegramClient);
+        this.callbacks = callbacks;
+        this.updates = updates;
     }
 
     @Override
@@ -121,6 +127,12 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
 
     @Override
     public void consume(Update update) {
+        if (update.hasCallbackQuery()) {
+            if (callbacks != null) {
+                callbacks.route(botUsername, update, output);
+            }
+            return;
+        }
         if (!update.hasMessage() || !update.getMessage().hasText()) {
             return;
         }
@@ -154,6 +166,9 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
 
         Optional<CommandParser.ParsedCommand> parsed = commandParser.parse(text, botUsername);
         if (parsed.isPresent()) {
+            if (updates != null && !updates.claim(botUsername, update.getUpdateId(), null)) {
+                return;
+            }
             CommandParser.ParsedCommand cmd = parsed.get();
             CommandContext routedCtx = new CommandContext(
                     chatId,
@@ -162,7 +177,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                     cmd.command(),
                     cmd.args(),
                     message.getEntities(),
-                    replyText -> send(chatId, replyText),
+                    replyText -> output.send(chatId, replyText, null),
                     text
             );
             commandRouter.route(routedCtx);
@@ -182,11 +197,5 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         return messageService.getMessage("member.defaultName");
     }
 
-    private void send(Long chatId, String text) {
-        try {
-            telegramClient.execute(SendMessage.builder().chatId(chatId).text(text).build());
-        } catch (TelegramApiException e) {
-            log.error("Failed to send message to {}: {}", chatId, e.getClass().getSimpleName());
-        }
-    }
+
 }

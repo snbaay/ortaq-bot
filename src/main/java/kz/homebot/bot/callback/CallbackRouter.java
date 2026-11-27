@@ -49,13 +49,20 @@ public class CallbackRouter {
                 answer.send(messages.getMessage("v2.denied"));
                 return;
             }
-            if (!message.isGroupMessage() && !message.isSuperGroupMessage()) {
-                answer.send(messages.getMessage("v2.groupOnly"));
-                return;
-            }
             var user = query.getFrom();
             if (user == null || user.getId() == null || user.getId() <= 0 || Boolean.TRUE.equals(user.getIsBot())) {
                 answer.send(messages.getMessage("v2.denied"));
+                return;
+            }
+            if (!message.isGroupMessage() && !message.isSuperGroupMessage()) {
+                answer.send(null);
+                if ("private".equals(message.getChat().getType()) && user.getId().equals(message.getChatId())
+                        && "v2:m:help".equals(query.getData()) && updates.claim(bot, update.getUpdateId(), query.getId())) {
+                    handlers.stream().filter(handler -> handler.kind().equals("m")).findFirst()
+                            .ifPresent(handler -> handler.privateAction("help", message.getChatId(), output));
+                } else {
+                    output.send(message.getChatId(), messages.getMessage("v2.groupOnly"), null);
+                }
                 return;
             }
             var member = members.findRegisteredMember(message.getChatId(), user.getId());
@@ -86,6 +93,10 @@ public class CallbackRouter {
     public interface Handler {
         String kind();
         void handle(Call call);
+
+        default boolean privateAction(String data, long chat, TelegramOutput output) {
+            return false;
+        }
     }
 
     public record Call(Member member, Message message, String data, String bot, Integer updateId,

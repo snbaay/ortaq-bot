@@ -1,5 +1,6 @@
 package kz.homebot.bot.interaction;
 
+import kz.homebot.bot.callback.CallbackRouter;
 import kz.homebot.domain.Member;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 @Repository
@@ -43,6 +45,41 @@ public class SessionStore {
             throw new IllegalArgumentException("Unknown household member");
         }
         return active(household, user, kind, now).orElseGet(() -> insert(household, user, chat, kind, state, payload, now));
+    }
+
+    @Transactional
+    public InteractionSession shared(Member member, long chat, String kind, String state) {
+        return insert(member.getHousehold().getId(), null, chat, kind, state, "{}", Instant.now());
+    }
+
+    @Transactional
+    public InteractionSession newMenu(Member member, long chat, String state) {
+        var session = open(member, chat, "menu", state, "{}");
+        return advance(session, state, "{}", false);
+    }
+
+    public boolean bindMenu(InteractionSession session, int messageId) {
+        return jdbc.update("""
+                UPDATE interaction_session SET menu_message_id = ? WHERE id = ? AND version = ?
+                AND closed_at IS NULL AND expires_at > ?
+                """, messageId, session.id(), session.version(), Timestamp.from(Instant.now())) == 1;
+    }
+
+    @Transactional
+    public <T> Optional<T> withButton(CallbackRouter.Call call, String kind,
+                                      BiFunction<InteractionSession, String, T> action) {
+        String[] fields = call.data().split(":", 3);
+        if (fields.length != 3 || !fields[0].matches("[0-9a-f]{32}") || !fields[1].matches("[0-9a-z]{1,6}")) {
+            return Optional.empty();
+        }
+        long user = call.member().getTelegramUserId();
+        return lock(fields[0]).filter(row -> row.kind().equals(kind) && row.activeAt(Instant.now())
+                && row.chatId() == call.message().getChatId()
+                && row.householdId() == call.member().getHousehold().getId()
+                && row.menuId() != null && row.menuId().equals(call.message().getMessageId())
+                && Integer.toString(row.version(), 36).equals(fields[1])
+                && (row.userId() == null || row.userId() == user)
+                && isMember(row.householdId(), user)).map(row -> action.apply(row, fields[2]));
     }
 
     public Optional<InteractionSession> active(long household, long user, String kind, Instant now) {

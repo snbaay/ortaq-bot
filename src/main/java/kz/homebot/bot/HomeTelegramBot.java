@@ -3,6 +3,8 @@ package kz.homebot.bot;
 import kz.homebot.bot.callback.CallbackRouter;
 import kz.homebot.bot.callback.ProcessedUpdates;
 import kz.homebot.bot.interaction.InteractionReplyRouter;
+import kz.homebot.bot.menu.MenuViews;
+import kz.homebot.domain.Member;
 import kz.homebot.service.MemberRegistrationService;
 import kz.homebot.config.AllowedChats;
 import kz.homebot.service.MessageService;
@@ -46,6 +48,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
     private final CallbackRouter callbacks;
     private final ProcessedUpdates updates;
     private final InteractionReplyRouter replies;
+    private final MenuViews menus;
     private final AllowedChats allowedChats;
 
     @Autowired
@@ -56,9 +59,9 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
             MemberRegistrationService memberRegistrationService,
             CommandParser commandParser,
             CommandRouter commandRouter,
-            AllowedChats allowedChats, CallbackRouter callbacks, ProcessedUpdates updates, InteractionReplyRouter replies) {
+            AllowedChats allowedChats, CallbackRouter callbacks, ProcessedUpdates updates, InteractionReplyRouter replies, MenuViews menus) {
         this(botToken, botUsername, messageService, memberRegistrationService, commandParser, commandRouter,
-                new OkHttpTelegramClient(botToken), allowedChats, callbacks, updates, replies);
+                new OkHttpTelegramClient(botToken), allowedChats, callbacks, updates, replies, menus);
     }
 
     // Secondary constructor for testing (inject TelegramClient directly)
@@ -80,13 +83,13 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                            CommandRouter commandRouter, ExpenseHandler expenseHandler,
                            TelegramClient telegramClient, AllowedChats allowedChats) {
         this(botToken, botUsername, messageService, memberRegistrationService, commandParser, commandRouter,
-                telegramClient, allowedChats, null, null, null);
+                telegramClient, allowedChats, null, null, null, null);
     }
 
     public HomeTelegramBot(String botToken, String botUsername, MessageService messageService,
                            MemberRegistrationService memberRegistrationService, CommandParser commandParser,
                            CommandRouter commandRouter, TelegramClient telegramClient, AllowedChats allowedChats,
-                           CallbackRouter callbacks, ProcessedUpdates updates, InteractionReplyRouter replies) {
+                           CallbackRouter callbacks, ProcessedUpdates updates, InteractionReplyRouter replies, MenuViews menus) {
         this.botToken = botToken;
         this.botUsername = botUsername;
         this.messageService = messageService;
@@ -99,6 +102,7 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
         this.callbacks = callbacks;
         this.updates = updates;
         this.replies = replies;
+        this.menus = menus;
     }
 
     @Override
@@ -162,9 +166,8 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                 || Boolean.TRUE.equals(from.getIsBot()) || message.getSenderChat() != null)) {
             return;
         }
-        if (isGroup && message.hasText()) {
-            memberRegistrationService.registerMember(chatId, chat.getTitle(), from);
-        }
+        Member member = isGroup && message.hasText()
+                ? memberRegistrationService.registerMember(chatId, chat.getTitle(), from) : null;
 
         Sender sender = from != null
                 ? new Sender(from.getId(), buildSenderName(from), from.getUserName())
@@ -183,8 +186,15 @@ public class HomeTelegramBot implements SpringLongPollingBot, LongPollingSingleT
                     cmd.command(),
                     cmd.args(),
                     message.getEntities(),
-                    replyText -> output.send(chatId, replyText, null),
-                    text
+                    replyText -> {
+                        if (member != null && menus != null) {
+                            menus.withMainButton(member, chatId, replyText, output);
+                        } else {
+                            output.send(chatId, replyText, null);
+                        }
+                    },
+                    text,
+                    menus == null ? null : new CommandContext.CommandSource(botUsername, update.getUpdateId(), member, output)
             );
             commandRouter.route(routedCtx);
         } else if (isGroup && replies != null && !text.startsWith("/")) {

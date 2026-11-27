@@ -15,12 +15,20 @@ public record CommandContext(
         String args,
         List<MessageEntity> entities,
         Consumer<String> replier,
-        String rawText
+        String rawText,
+        CommandSource source
 ) {
     public CommandContext(Long chatId, String chatType, Sender sender, String command, String args,
                           List<MessageEntity> entities, Consumer<String> replier) {
         this(chatId, chatType, sender, command, args, entities, replier, args);
     }
+    public CommandContext(Long chatId, String chatType, Sender sender, String command, String args,
+                          List<MessageEntity> entities, Consumer<String> replier, String rawText) {
+        this(chatId, chatType, sender, command, args, entities, replier, rawText, null);
+    }
+
+    public record CommandSource(String bot, int updateId, kz.homebot.domain.Member member, TelegramOutput output) {}
+
     public CommandContext {
         if (entities == null) {
             entities = Collections.emptyList();
